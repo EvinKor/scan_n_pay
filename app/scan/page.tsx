@@ -132,7 +132,7 @@ export default function ScanPage() {
     }
   }
 
-  const total = items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const total = items.reduce((s, i) => s + (Number(i.price) || 0), 0) + (serviceCharge || 0) + (sst || 0);
 
   return (
     <main className="min-h-screen pb-32 px-4 pt-8 max-w-lg mx-auto">
@@ -154,7 +154,19 @@ export default function ScanPage() {
           Tip: place receipt flat, fill the frame, avoid hands or busy backgrounds.
         </div>
         {preview ? (
-          <img src={preview} alt="Receipt" className="max-h-48 rounded-xl object-contain" />
+          <div className="flex flex-col items-center">
+            <img src={preview} alt="Receipt" className="max-h-48 rounded-xl object-contain mb-3" />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileRef.current?.click();
+              }}
+              className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+            >
+              🔄 Rescan / Upload New
+            </button>
+          </div>
         ) : (
           <>
             <span className="text-4xl mb-2">📷</span>
@@ -243,6 +255,40 @@ export default function ScanPage() {
           >
             + Add item
           </button>
+
+          {/* Service Charge & SST Inputs */}
+          <div className="bg-surface rounded-xl p-4 mt-4 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-zinc-400 text-sm font-medium">Service Charge</span>
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-500 text-sm font-mono">RM</span>
+                <input
+                  type="number"
+                  value={serviceCharge || ""}
+                  onChange={(e) => setServiceCharge(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  step="0.10"
+                  min="0"
+                  className="w-20 bg-zinc-800 rounded-lg px-2 py-1 text-right text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-600"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-zinc-400 text-sm font-medium">SST</span>
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-500 text-sm font-mono">RM</span>
+                <input
+                  type="number"
+                  value={sst || ""}
+                  onChange={(e) => setSst(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  step="0.10"
+                  min="0"
+                  className="w-20 bg-zinc-800 rounded-lg px-2 py-1 text-right text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-600"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

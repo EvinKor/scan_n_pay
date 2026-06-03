@@ -15,11 +15,21 @@ export function buildTNGLink(phone: string, amount: number, memo = "SplitLah"): 
 
 export function openTNGPayment(phone: string, amount: number, memo?: string) {
   const link = buildTNGLink(phone, amount, memo);
-  window.location.href = link;
+
+  // Using an anchor tag click is more robust for deep links inside PWAs on iOS/Android
+  const a = document.createElement("a");
+  a.href = link;
+  a.target = "_top";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
   // Fallback: if app doesn't open within 1.5s, show web fallback
   setTimeout(() => {
-    const fallback = `https://tngdigital.com.my/`;
-    window.open(fallback, "_blank");
+    // We only want to trigger the fallback if the app didn't pull us out of the browser
+    if (document.visibilityState === "visible") {
+      const fallback = `https://tngdigital.com.my/`;
+      window.open(fallback, "_blank");
+    }
   }, 1500);
 }

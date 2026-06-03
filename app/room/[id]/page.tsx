@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   getSession,
@@ -8,6 +8,9 @@ import {
   subscribeToSession,
   calculateTotals,
   Session,
+  LineItem,
+  getAssignments,
+  getItemShare,
 } from "@/lib/session";
 import { getLocalUser } from "@/lib/identity";
 import { openTNGPayment } from "@/lib/tng";
@@ -24,6 +27,10 @@ export default function RoomPage() {
   const [tab, setTab] = useState<Tab>("split");
   const [saving, setSaving] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "tng" | "other" | null>(null);
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [viewingProof, setViewingProof] = useState<string | null>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
 
   const myName = user?.name || "";
 
@@ -59,12 +66,38 @@ export default function RoomPage() {
     if (!session || session.splitMode !== "byItem") return;
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
-      const already = item.assignedTo.includes(myName);
+      const assignments = { ...getAssignments(item) };
+      const alreadyHas = (assignments[myName] || 0) > 0;
+      if (alreadyHas) {
+        delete assignments[myName];
+      } else {
+        assignments[myName] = 1;
+      }
       return {
         ...item,
-        assignedTo: already
-          ? item.assignedTo.filter((n) => n !== myName)
-          : [...item.assignedTo, myName],
+        assignedTo: assignments,
+      };
+    });
+    const updated = { ...session, items };
+    setSession(updated);
+    await updateSession(id, { items });
+  }
+
+  async function adjustClaimedQuantity(itemId: string, delta: number) {
+    if (!session || session.splitMode !== "byItem") return;
+    const items = session.items.map((item) => {
+      if (item.id !== itemId) return item;
+      const assignments = { ...getAssignments(item) };
+      const current = assignments[myName] || 0;
+      const next = current + delta;
+      if (next <= 0) {
+        delete assignments[myName];
+      } else {
+        assignments[myName] = Math.min(next, item.quantity);
+      }
+      return {
+        ...item,
+        assignedTo: assignments,
       };
     });
     const updated = { ...session, items };
@@ -74,16 +107,18 @@ export default function RoomPage() {
 
   async function lockAndPay() {
     if (!session || !isOwner) return; // only owner can lock
-    const totals = calculateTotals(session);
+    const totals = calculateTotals(session, true);
     await updateSession(id, { totals, status: "paying" });
     setSession((s) => s ? { ...s, totals, status: "paying" } : s);
     setTab("pay");
   }
 
-  async function markPaid() {
+  async function markPaidWithMethod(method: "cash" | "tng" | "other", proof?: string) {
     if (!session) return;
     const participants = session.participants.map((p) =>
-      p.name === myName ? { ...p, hasPaid: true } : p
+      p.name === myName
+        ? { ...p, hasPaid: true, paymentMethod: method, proofUrl: proof || p.proofUrl }
+        : p
     );
     await updateSession(id, { participants });
     setSession((s) => s ? { ...s, participants } : s);
@@ -91,10 +126,45 @@ export default function RoomPage() {
 
   function handleTNGPay() {
     if (!session) return;
-    const amount = session.totals?.[myName] ?? 0;
+    const amount = totals?.[myName] ?? 0;
     if (amount <= 0) return;
     openTNGPayment(session.paidByPhone, amount, `SplitLah ${session.code}`);
-    setTimeout(markPaid, 2000);
+    // Don't auto-mark as paid — let user come back and attach proof
+  }
+
+  function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Compress and convert to base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        setProofImage(dataUrl);
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    // Reset input so user can re-select
+    e.target.value = "";
+  }
+
+  async function confirmPayment() {
+    if (!paymentMethod) return;
+    await markPaidWithMethod(paymentMethod, proofImage || undefined);
+    setPaymentMethod(null);
+    setProofImage(null);
   }
 
   async function handleShare() {
@@ -131,15 +201,15 @@ export default function RoomPage() {
     );
   }
 
-  const totals = session.status === "paying" || session.status === "done"
-    ? session.totals
-    : calculateTotals(session);
+  const totals = calculateTotals(session);
 
   const myTotal = totals?.[myName] ?? 0;
   const amIPayer = session.paidBy === myName;
   const myParticipant = session.participants.find((p) => p.name === myName);
   const pendingCount = session.participants.filter((p) => !p.hasPaid && p.name !== session.paidBy).length;
-  const grandTotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const itemsSubtotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0);
+  const isLocked = session.status === "paying" || session.status === "done";
 
   return (
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
@@ -159,9 +229,19 @@ export default function RoomPage() {
             </button>
           </div>
         </div>
-        <p className="text-zinc-400 text-sm">
-          Paid by <span className="text-brand font-medium">{session.paidBy}</span>
-          {isOwner && <span className="text-zinc-600 text-xs ml-2">· You're the host</span>}
+        <p className="text-zinc-400 text-sm flex items-center justify-between mt-1">
+          <span>
+            Paid by <span className="text-brand font-medium">{session.paidBy}</span>
+            {isOwner && <span className="text-zinc-600 text-xs ml-2">· You're the host</span>}
+          </span>
+          {isOwner && session.status === "splitting" && (
+            <button
+              onClick={() => router.push(`/scan?session=${session.id}`)}
+              className="text-zinc-500 hover:text-brand text-xs font-semibold flex items-center gap-1 transition-all"
+            >
+              🔄 Rescan / Edit items
+            </button>
+          )}
         </p>
       </div>
 
@@ -254,11 +334,11 @@ export default function RoomPage() {
             </p>
             <div className="space-y-2">
               {session.items.map((item) => {
-                const isMine = item.assignedTo.includes(myName);
-                const share =
-                  item.assignedTo.length > 0
-                    ? item.price / item.assignedTo.length
-                    : item.price;
+                const assignments = getAssignments(item);
+                const isMine = (assignments[myName] || 0) > 0;
+                const myClaimedQty = assignments[myName] || 0;
+                const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
+                const myShare = getItemShare(item, myName, session.participants.length, isLocked, session.paidBy);
 
                 return (
                   <div
@@ -283,23 +363,56 @@ export default function RoomPage() {
                           {isMine && <span className="text-black text-xs font-bold">✓</span>}
                         </div>
                       )}
-                      <span className="text-white text-sm truncate">{item.name}</span>
-                      {(item.quantity ?? 1) > 1 && (
-                        <span className="text-zinc-500 text-xs flex-shrink-0">×{item.quantity}</span>
-                      )}
-                      {item.assignedTo.length > 1 && (
-                        <span className="text-zinc-500 text-xs flex-shrink-0">
-                          ÷{item.assignedTo.length}
-                        </span>
-                      )}
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white text-sm truncate">{item.name}</span>
+                          {(item.quantity ?? 1) > 1 && (
+                            <span className="text-zinc-500 text-xs flex-shrink-0">×{item.quantity}</span>
+                          )}
+                        </div>
+                        {session.splitMode === "byItem" && assignees.length > 0 && (
+                          <div className="text-zinc-500 text-xs mt-1 truncate">
+                            {assignees.map((name) => {
+                              const qty = assignments[name];
+                              return `${name}${item.quantity > 1 ? ` (${qty})` : ""}`;
+                            }).join(", ")}
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Quantity Adjuster for Claimed Items */}
+                    {session.splitMode === "byItem" && isMine && item.quantity > 1 && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1 mx-2 flex-shrink-0"
+                      >
+                        <button
+                          onClick={() => adjustClaimedQuantity(item.id, -1)}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+                        >
+                          -
+                        </button>
+                        <span className="text-white text-sm font-mono px-1 min-w-[12px] text-center">
+                          {myClaimedQty}
+                        </span>
+                        <button
+                          onClick={() => adjustClaimedQuantity(item.id, 1)}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+                          disabled={myClaimedQty >= item.quantity}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+
                     <div className="text-right flex-shrink-0 ml-2">
                       <span className="text-white font-mono text-sm">
                         RM {(Number(item.price) || 0).toFixed(2)}
                       </span>
-                      {session.splitMode === "byItem" && isMine && item.assignedTo.length > 1 && (
+                      {session.splitMode === "byItem" && isMine && (
                         <p className="text-brand text-xs font-mono">
-                          your share: RM {share.toFixed(2)}
+                          your share: RM {myShare.toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -322,9 +435,29 @@ export default function RoomPage() {
                 </span>
               </div>
             ))}
+            {(session.serviceCharge > 0 || session.sst > 0) && (
+              <div className="border-t border-muted pt-2 mt-2 space-y-1">
+                <div className="flex justify-between text-zinc-400 text-xs">
+                  <span>Subtotal</span>
+                  <span className="font-mono">RM {itemsSubtotal.toFixed(2)}</span>
+                </div>
+                {session.serviceCharge > 0 && (
+                  <div className="flex justify-between text-zinc-400 text-xs">
+                    <span>Service Charge</span>
+                    <span className="font-mono">RM {session.serviceCharge.toFixed(2)}</span>
+                  </div>
+                )}
+                {session.sst > 0 && (
+                  <div className="flex justify-between text-zinc-400 text-xs">
+                    <span>SST</span>
+                    <span className="font-mono">RM {session.sst.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="border-t border-muted pt-2 mt-2 flex justify-between">
-              <span className="text-zinc-400 text-sm">Total</span>
-              <span className="font-mono font-semibold text-white">
+              <span className="text-zinc-400 text-sm font-semibold">Total</span>
+              <span className="font-mono font-bold text-brand">
                 RM {grandTotal.toFixed(2)}
               </span>
             </div>
@@ -354,15 +487,6 @@ export default function RoomPage() {
                   {session.participants
                     .filter((p) => p.name !== session.paidBy)
                     .map((p) => {
-                      // Get items relevant to this participant
-                      const personItems = session.splitMode === "byItem"
-                        ? session.items.filter(
-                            (item) =>
-                              item.assignedTo.includes(p.name) ||
-                              item.assignedTo.length === 0
-                          )
-                        : session.items;
-
                       return (
                         <div key={p.name} className="bg-muted/50 rounded-xl overflow-hidden">
                           <div className="flex items-center justify-between px-4 py-3">
@@ -374,41 +498,134 @@ export default function RoomPage() {
                                 )}
                               />
                               <span className="text-sm text-white font-medium">{p.name}</span>
-                              {p.hasPaid && <span className="text-brand text-xs">✓ paid</span>}
+                              {p.hasPaid && (
+                                <span className="text-brand text-xs flex items-center gap-1">
+                                  ✓ {p.paymentMethod === "cash" ? "Cash" : p.paymentMethod === "tng" ? "TNG" : p.paymentMethod === "other" ? "Other" : "paid"}
+                                </span>
+                              )}
                             </div>
-                            <span className="font-mono text-sm text-white font-semibold">
-                              RM {(totals?.[p.name] ?? 0).toFixed(2)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {p.hasPaid && p.proofUrl && (
+                                <button
+                                  onClick={() => setViewingProof(p.proofUrl!)}
+                                  className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full hover:bg-brand/30 transition-colors"
+                                >
+                                  📎 Proof
+                                </button>
+                              )}
+                              <span className="font-mono text-sm text-white font-semibold">
+                                RM {(totals?.[p.name] ?? 0).toFixed(2)}
+                              </span>
+                            </div>
                           </div>
                           {/* Item breakdown */}
                           <div className="border-t border-zinc-700/50 px-4 py-2 space-y-1">
-                            {personItems.map((item) => {
-                              const price = Number(item.price) || 0;
-                              if (price <= 0) return null;
-                              const shareCount =
-                                session.splitMode === "byItem"
-                                  ? item.assignedTo.length > 0
-                                    ? item.assignedTo.length
-                                    : session.participants.length
-                                  : session.participants.length;
-                              const share = price / shareCount;
+                            {(() => {
+                              const personSubtotal = session.items.reduce((sum, item) => {
+                                const share = session.splitMode === "byItem"
+                                  ? getItemShare(item, p.name, session.participants.length, isLocked, session.paidBy)
+                                  : (Number(item.price) || 0) / session.participants.length;
+                                return sum + share;
+                              }, 0);
+
+                              const totalSubtotal = session.items.reduce((sum, item) => {
+                                return sum + (Number(item.price) || 0);
+                              }, 0);
+
+                              const ratio = totalSubtotal > 0 ? personSubtotal / totalSubtotal : 1 / session.participants.length;
+                              const personServiceCharge = (session.serviceCharge || 0) * ratio;
+                              const personSst = (session.sst || 0) * ratio;
+
+                              // Group items into claimed and unclaimed (if splitMode is byItem)
+                              const claimedItems: { name: string; share: number; qtyClaimed: number; totalQty: number }[] = [];
+                              let unclaimedShareSum = 0;
+
+                              session.items.forEach((item) => {
+                                const price = Number(item.price) || 0;
+                                if (price <= 0) return;
+
+                                if (session.splitMode === "byItem") {
+                                  const assignments = getAssignments(item);
+                                  const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
+                                  const isClaimedByMe = assignments[p.name] > 0;
+
+                                  if (isClaimedByMe) {
+                                    const share = getItemShare(item, p.name, session.participants.length, isLocked, session.paidBy);
+                                    claimedItems.push({
+                                      name: item.name,
+                                      share,
+                                      qtyClaimed: assignments[p.name],
+                                      totalQty: item.quantity
+                                    });
+                                  } else if (assignees.length === 0) {
+                                    const share = getItemShare(item, p.name, session.participants.length, isLocked, session.paidBy);
+                                    unclaimedShareSum += share;
+                                  }
+                                } else {
+                                  // Even split: show all items since everyone pays an equal share
+                                  const share = price / session.participants.length;
+                                  claimedItems.push({
+                                    name: item.name,
+                                    share,
+                                    qtyClaimed: 0,
+                                    totalQty: item.quantity
+                                  });
+                                }
+                              });
+
                               return (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center justify-between text-xs"
-                                >
-                                  <span className="text-zinc-400 truncate mr-2">
-                                    {item.name}
-                                    {shareCount > 1 && (
-                                      <span className="text-zinc-600 ml-1">÷{shareCount}</span>
-                                    )}
-                                  </span>
-                                  <span className="text-zinc-300 font-mono flex-shrink-0">
-                                    RM {share.toFixed(2)}
-                                  </span>
-                                </div>
+                                <>
+                                  {claimedItems.map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between text-xs"
+                                    >
+                                      <span className="text-zinc-400 truncate mr-2">
+                                        {item.name}
+                                        {session.splitMode === "byItem" && item.totalQty > 1 && item.qtyClaimed > 0 && (
+                                          <span className="text-zinc-500 ml-1">({item.qtyClaimed} of {item.totalQty})</span>
+                                        )}
+                                      </span>
+                                      <span className="text-zinc-300 font-mono flex-shrink-0">
+                                        RM {item.share.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+
+                                  {/* Shared / Unclaimed items sum */}
+                                  {session.splitMode === "byItem" && unclaimedShareSum > 0 && (
+                                    <div className="flex items-center justify-between text-xs text-zinc-500 italic">
+                                      <span>Unclaimed Items (on host)</span>
+                                      <span className="font-mono flex-shrink-0">
+                                        RM {unclaimedShareSum.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Service charge and SST proportional breakdown */}
+                                  {(session.serviceCharge > 0 || session.sst > 0) && (
+                                    <div className="border-t border-zinc-700/30 pt-1 mt-1 space-y-0.5">
+                                      <div className="flex justify-between text-[10px] text-zinc-500">
+                                        <span>Subtotal</span>
+                                        <span className="font-mono">RM {personSubtotal.toFixed(2)}</span>
+                                      </div>
+                                      {session.serviceCharge > 0 && (
+                                        <div className="flex justify-between text-[10px] text-zinc-500">
+                                          <span>Service Charge</span>
+                                          <span className="font-mono">RM {personServiceCharge.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      {session.sst > 0 && (
+                                        <div className="flex justify-between text-[10px] text-zinc-500">
+                                          <span>SST</span>
+                                          <span className="font-mono">RM {personSst.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         </div>
                       );
@@ -442,41 +659,110 @@ export default function RoomPage() {
                 <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Your items</p>
                 <div className="space-y-1.5">
                   {(() => {
-                    const myItems = session.splitMode === "byItem"
-                      ? session.items.filter(
-                          (item) =>
-                            item.assignedTo.includes(myName) ||
-                            item.assignedTo.length === 0
-                        )
-                      : session.items;
+                    const mySubtotal = session.items.reduce((sum, item) => {
+                      const share = session.splitMode === "byItem"
+                        ? getItemShare(item, myName, session.participants.length, isLocked, session.paidBy)
+                        : (Number(item.price) || 0) / session.participants.length;
+                      return sum + share;
+                    }, 0);
 
-                    return myItems.map((item) => {
+                    const totalSubtotal = session.items.reduce((sum, item) => {
+                      return sum + (Number(item.price) || 0);
+                    }, 0);
+
+                    const ratio = totalSubtotal > 0 ? mySubtotal / totalSubtotal : 1 / session.participants.length;
+                    const myServiceCharge = (session.serviceCharge || 0) * ratio;
+                    const mySst = (session.sst || 0) * ratio;
+
+                    // Group items into claimed and unclaimed (if splitMode is byItem)
+                    const claimedItems: { name: string; share: number; qtyClaimed: number; totalQty: number }[] = [];
+                    let unclaimedShareSum = 0;
+
+                    session.items.forEach((item) => {
                       const price = Number(item.price) || 0;
-                      if (price <= 0) return null;
-                      const shareCount =
-                        session.splitMode === "byItem"
-                          ? item.assignedTo.length > 0
-                            ? item.assignedTo.length
-                            : session.participants.length
-                          : session.participants.length;
-                      const share = price / shareCount;
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between"
-                        >
-                          <span className="text-zinc-300 text-sm truncate mr-2">
-                            {item.name}
-                            {shareCount > 1 && (
-                              <span className="text-zinc-600 text-xs ml-1">÷{shareCount}</span>
-                            )}
-                          </span>
-                          <span className="text-white font-mono text-sm flex-shrink-0">
-                            RM {share.toFixed(2)}
-                          </span>
-                        </div>
-                      );
+                      if (price <= 0) return;
+
+                      if (session.splitMode === "byItem") {
+                        const assignments = getAssignments(item);
+                        const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
+                        const isClaimedByMe = assignments[myName] > 0;
+
+                        if (isClaimedByMe) {
+                          const share = getItemShare(item, myName, session.participants.length, isLocked, session.paidBy);
+                          claimedItems.push({
+                            name: item.name,
+                            share,
+                            qtyClaimed: assignments[myName],
+                            totalQty: item.quantity
+                          });
+                        } else if (assignees.length === 0) {
+                          const share = getItemShare(item, myName, session.participants.length, isLocked, session.paidBy);
+                          unclaimedShareSum += share;
+                        }
+                      } else {
+                        // Even split: show all items since everyone pays an equal share
+                        const share = price / session.participants.length;
+                        claimedItems.push({
+                          name: item.name,
+                          share,
+                          qtyClaimed: 0,
+                          totalQty: item.quantity
+                        });
+                      }
                     });
+
+                    return (
+                      <>
+                        {claimedItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between"
+                          >
+                            <span className="text-zinc-300 text-sm truncate mr-2">
+                              {item.name}
+                              {session.splitMode === "byItem" && item.totalQty > 1 && item.qtyClaimed > 0 && (
+                                <span className="text-zinc-500 text-xs ml-1">({item.qtyClaimed} of {item.totalQty})</span>
+                              )}
+                            </span>
+                            <span className="text-white font-mono text-sm flex-shrink-0">
+                              RM {item.share.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+
+                        {/* Shared / Unclaimed items sum */}
+                        {session.splitMode === "byItem" && unclaimedShareSum > 0 && (
+                          <div className="flex items-center justify-between text-zinc-400 text-sm italic">
+                            <span>Unclaimed Items (on host)</span>
+                            <span className="font-mono text-white text-sm flex-shrink-0">
+                              RM {unclaimedShareSum.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Service charge and SST proportional breakdown */}
+                        {(session.serviceCharge > 0 || session.sst > 0) && (
+                          <div className="border-t border-zinc-700/50 pt-2 mt-2 space-y-1">
+                            <div className="flex justify-between text-xs text-zinc-400">
+                              <span>Subtotal</span>
+                              <span className="font-mono">RM {mySubtotal.toFixed(2)}</span>
+                            </div>
+                            {session.serviceCharge > 0 && (
+                              <div className="flex justify-between text-xs text-zinc-400">
+                                <span>Service Charge</span>
+                                <span className="font-mono">RM {myServiceCharge.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {session.sst > 0 && (
+                              <div className="flex justify-between text-xs text-zinc-400">
+                                <span>SST</span>
+                                <span className="font-mono">RM {mySst.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
                   })()}
                   <div className="border-t border-muted pt-1.5 mt-1.5 flex justify-between">
                     <span className="text-zinc-400 text-sm font-medium">Total</span>
@@ -487,27 +773,119 @@ export default function RoomPage() {
                 </div>
               </div>
 
+              {/* Hidden file input for proof upload */}
+              <input
+                ref={proofInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleProofUpload}
+                className="hidden"
+              />
+
               {myParticipant?.hasPaid ? (
-                <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center">
+                <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center space-y-2">
                   <p className="text-brand font-semibold">✓ You've paid!</p>
+                  {myParticipant.paymentMethod && (
+                    <p className="text-zinc-400 text-xs">
+                      via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 Touch 'n Go" : "💳 Other"}
+                    </p>
+                  )}
+                </div>
+              ) : !paymentMethod ? (
+                /* Step 1: Choose payment method */
+                <div className="space-y-3">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">How are you paying?</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => setPaymentMethod("tng")}
+                      className="bg-[#015ABF] hover:bg-[#0147a0] text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span className="text-2xl">💚</span>
+                      TNG
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethod("cash")}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span className="text-2xl">💵</span>
+                      Cash
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethod("other")}
+                      className="bg-muted hover:bg-zinc-700 text-zinc-300 font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                    >
+                      <span className="text-2xl">💳</span>
+                      Other
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <button
-                  onClick={handleTNGPay}
-                  className="w-full bg-brand text-black font-bold rounded-2xl py-5 text-lg flex items-center justify-center gap-3 hover:bg-opacity-90 active:scale-95 transition-all"
-                >
-                  <span className="text-2xl">💚</span>
-                  Pay via TNG · RM {myTotal.toFixed(2)}
-                </button>
-              )}
+                /* Step 2: Payment confirmation with proof */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">
+                      Paying via {paymentMethod === "tng" ? "💚 Touch 'n Go" : paymentMethod === "cash" ? "💵 Cash" : "💳 Other"}
+                    </p>
+                    <button
+                      onClick={() => { setPaymentMethod(null); setProofImage(null); }}
+                      className="text-zinc-500 text-xs hover:text-zinc-300 transition-colors"
+                    >
+                      ← Change
+                    </button>
+                  </div>
 
-              {!myParticipant?.hasPaid && (
-                <button
-                  onClick={markPaid}
-                  className="w-full bg-muted text-zinc-300 font-medium rounded-2xl py-3 text-sm hover:bg-zinc-700 active:scale-95 transition-all"
-                >
-                  Mark as paid manually
-                </button>
+                  {/* TNG: Open TNG app button */}
+                  {paymentMethod === "tng" && (
+                    <button
+                      onClick={handleTNGPay}
+                      className="w-full bg-[#015ABF] text-white font-bold rounded-2xl py-4 text-base flex items-center justify-center gap-3 hover:bg-[#0147a0] active:scale-95 transition-all"
+                    >
+                      <span className="text-xl">💚</span>
+                      Open TNG · Transfer RM {myTotal.toFixed(2)}
+                    </button>
+                  )}
+
+                  {/* Proof upload */}
+                  <div className="bg-surface rounded-2xl p-4 space-y-3">
+                    <p className="text-zinc-400 text-sm">
+                      {paymentMethod === "cash"
+                        ? "Paid cash? Snap a photo as proof (optional)."
+                        : "Attach a screenshot of your payment as proof (optional)."}
+                    </p>
+
+                    {proofImage ? (
+                      <div className="relative">
+                        <img
+                          src={proofImage}
+                          alt="Payment proof"
+                          className="w-full max-h-48 object-contain rounded-xl border border-zinc-700"
+                        />
+                        <button
+                          onClick={() => setProofImage(null)}
+                          className="absolute top-2 right-2 bg-black/70 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-black/90 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => proofInputRef.current?.click()}
+                        className="w-full bg-muted hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-zinc-600"
+                      >
+                        📷 Attach proof photo
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Confirm payment */}
+                  <button
+                    onClick={confirmPayment}
+                    className="w-full bg-brand text-black font-bold rounded-2xl py-5 text-lg flex items-center justify-center gap-2 hover:bg-opacity-90 active:scale-95 transition-all"
+                  >
+                    ✓ Confirm Payment · RM {myTotal.toFixed(2)}
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -543,6 +921,35 @@ export default function RoomPage() {
           >
             Go to Payment →
           </button>
+        </div>
+      )}
+      {/* Proof image viewer modal */}
+      {viewingProof && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setViewingProof(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-surface rounded-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
+              <p className="text-white font-semibold text-sm">Payment Proof</p>
+              <button
+                onClick={() => setViewingProof(null)}
+                className="text-zinc-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-zinc-700 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <img
+                src={viewingProof}
+                alt="Payment proof"
+                className="w-full rounded-xl"
+              />
+            </div>
+          </div>
         </div>
       )}
     </main>

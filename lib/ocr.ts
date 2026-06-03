@@ -57,25 +57,7 @@ export async function extractReceiptItems(
           assignedTo: [],
         }));
 
-        // Add service charge and SST as line items so they get split
-        if (data.serviceCharge > 0) {
-          items.push({
-            id: nanoid(),
-            name: "Service Charge",
-            quantity: 1,
-            price: Math.round(data.serviceCharge * 100) / 100,
-            assignedTo: [],
-          });
-        }
-        if (data.sst > 0) {
-          items.push({
-            id: nanoid(),
-            name: "SST",
-            quantity: 1,
-            price: Math.round(data.sst * 100) / 100,
-            assignedTo: [],
-          });
-        }
+        // Do not add service charge and SST as line items so they get split proportionally instead of evenly
 
         return {
           items,
@@ -385,27 +367,7 @@ function parseReceiptText(text: string): ReceiptResult {
     });
   }
 
-  // If we found service charge, add it as a line item so it shows up in the split
-  if (serviceCharge > 0) {
-    items.push({
-      id: nanoid(),
-      name: "Service Charge",
-      quantity: 1,
-      price: serviceCharge,
-      assignedTo: [],
-    });
-  }
-
-  // If we found SST, add it as a line item too
-  if (sst > 0) {
-    items.push({
-      id: nanoid(),
-      name: "SST",
-      quantity: 1,
-      price: sst,
-      assignedTo: [],
-    });
-  }
+  // Do not add service charge and SST as claimable line items so they are split proportionally instead
 
   const itemsTotal = items.reduce((s, it) => s + (it.price || 0), 0);
   const computedTotal = +itemsTotal.toFixed(2);
