@@ -191,8 +191,8 @@ export default function RoomPage() {
       document.body.removeChild(a);
     }
     
-    // Open TNG app via App Store Link (which auto-launches if installed on iOS)
-    window.location.href = "https://apps.apple.com/my/app/touch-n-go-ewallet/id1343446791";
+    // Open TNG app directly (bypasses App Store region lock)
+    window.location.href = "tngd://";
   }
 
   function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
