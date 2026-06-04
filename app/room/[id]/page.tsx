@@ -32,6 +32,11 @@ export default function RoomPage() {
   const [viewingProof, setViewingProof] = useState<string | null>(null);
   const proofInputRef = useRef<HTMLInputElement>(null);
 
+  // Add missing item state
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemPrice, setNewItemPrice] = useState("");
+
   const myName = user?.name || "";
 
   // Load + subscribe
@@ -44,11 +49,22 @@ export default function RoomPage() {
       setSession(s);
     });
 
+    // Supabase Realtime Subscription
     const channel = subscribeToSession(id, (updated) => {
       setSession(updated);
     });
 
-    return () => { channel.unsubscribe(); };
+    // Fallback polling (in case Supabase Realtime is not enabled on the sessions table)
+    const pollInterval = setInterval(() => {
+      getSession(id).then((s) => {
+        if (s) setSession(s);
+      });
+    }, 3000);
+
+    return () => {
+      channel.unsubscribe();
+      clearInterval(pollInterval);
+    };
   }, [id]);
 
   const isOwner = session?.owner === myName;
@@ -62,8 +78,37 @@ export default function RoomPage() {
     setSaving(false);
   }
 
+  async function handleAddMissingItem() {
+    if (!session || !newItemName.trim() || !newItemPrice) return;
+    const price = parseFloat(newItemPrice);
+    if (isNaN(price) || price < 0) return;
+    
+    setSaving(true);
+    const newItem: LineItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      name: newItemName.trim(),
+      quantity: 1,
+      price: price,
+      assignedTo: { [myName]: 1 }, // Auto-assign to the person who added it
+    };
+    
+    const items = [...session.items, newItem];
+    const participants = session.participants.map(p => 
+      p.name === myName ? { ...p, hasPaid: false, paymentMethod: undefined, proofUrl: undefined } : p
+    );
+    
+    const updated = { ...session, items, participants };
+    setSession(updated);
+    await updateSession(id, { items, participants });
+    
+    setIsAddingItem(false);
+    setNewItemName("");
+    setNewItemPrice("");
+    setSaving(false);
+  }
+
   async function toggleItemAssignment(itemId: string) {
-    if (!session || session.splitMode !== "byItem") return;
+    if (!session || session.splitMode !== "byItem" || myParticipant?.hasPaid) return;
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
@@ -84,7 +129,7 @@ export default function RoomPage() {
   }
 
   async function adjustClaimedQuantity(itemId: string, delta: number) {
-    if (!session || session.splitMode !== "byItem") return;
+    if (!session || session.splitMode !== "byItem" || myParticipant?.hasPaid) return;
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
@@ -215,6 +260,9 @@ export default function RoomPage() {
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
+        <div className="mb-4 inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
+          👤 Playing as <span className="font-bold">{myName}</span>
+        </div>
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-bold font-mono">{session.code}</h1>
           <div className="flex items-center gap-2">
@@ -338,15 +386,24 @@ export default function RoomPage() {
                 const isMine = (assignments[myName] || 0) > 0;
                 const myClaimedQty = assignments[myName] || 0;
                 const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
+                const totalQty = item.quantity || 1;
+                const totalClaimed = assignees.reduce((sum, n) => sum + assignments[n], 0);
+                const isFullyClaimed = totalClaimed >= totalQty;
+                const canInteract = !myParticipant?.hasPaid && (isMine || !isFullyClaimed);
                 const myShare = getItemShare(item, myName, session.participants.length, isLocked, session.paidBy);
 
                 return (
                   <div
                     key={item.id}
-                    onClick={() => toggleItemAssignment(item.id)}
+                    onClick={() => {
+                      if (session.splitMode === "byItem" && canInteract) {
+                        toggleItemAssignment(item.id);
+                      }
+                    }}
                     className={clsx(
                       "flex items-center justify-between rounded-xl px-4 py-3 transition-all",
-                      session.splitMode === "byItem" && "cursor-pointer",
+                      session.splitMode === "byItem" && canInteract ? "cursor-pointer" : "cursor-not-allowed",
+                      !canInteract && "opacity-50 grayscale",
                       isMine && session.splitMode === "byItem"
                         ? "bg-brand/10 border border-brand/30"
                         : "bg-surface"
@@ -420,6 +477,61 @@ export default function RoomPage() {
                 );
               })}
             </div>
+
+            {/* Inline Add Missing Item */}
+            {session.splitMode === "byItem" && (
+              <div className="mt-3">
+                {isAddingItem ? (
+                  <div className="bg-surface rounded-xl p-3 border border-brand/30 space-y-3">
+                    <p className="text-xs text-brand font-medium">Add missing item</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Item name"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
+                        autoFocus
+                      />
+                      <div className="relative w-24">
+                        <span className="absolute left-3 top-2 text-zinc-500 text-sm">RM</span>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          step="0.10"
+                          min="0"
+                          value={newItemPrice}
+                          onChange={(e) => setNewItemPrice(e.target.value)}
+                          className="w-full bg-zinc-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddMissingItem}
+                        disabled={!newItemName.trim() || !newItemPrice || saving}
+                        className="flex-1 bg-brand text-black font-semibold text-sm py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-all"
+                      >
+                        Add & Claim
+                      </button>
+                      <button
+                        onClick={() => { setIsAddingItem(false); setNewItemName(""); setNewItemPrice(""); }}
+                        className="px-4 bg-zinc-800 text-zinc-300 font-semibold text-sm py-2 rounded-lg hover:bg-zinc-700 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingItem(true)}
+                    className="w-full border border-dashed border-zinc-700 rounded-xl py-3 text-zinc-400 text-sm hover:border-brand hover:text-brand transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>+</span> Add missing item
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Summary */}

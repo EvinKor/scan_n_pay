@@ -16,13 +16,8 @@ export function buildTNGLink(phone: string, amount: number, memo = "SplitLah"): 
 export function openTNGPayment(phone: string, amount: number, memo?: string) {
   const link = buildTNGLink(phone, amount, memo);
 
-  // Using an anchor tag click is more robust for deep links inside PWAs on iOS/Android
-  const a = document.createElement("a");
-  a.href = link;
-  a.target = "_top";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  // Direct location change is often strictly required by Safari for custom schemes
+  window.location.href = link;
 
   // Fallback: if app doesn't open within 1.5s, show web fallback
   setTimeout(() => {
