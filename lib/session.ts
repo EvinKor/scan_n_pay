@@ -9,6 +9,7 @@ export interface LineItem {
   quantity: number;
   price: number;
   assignedTo: string[] | Record<string, number>; // participant names or mapping of name -> quantity
+  addedLater?: boolean; // true for items added via "Add missing item" after initial scan
 }
 
 export interface Participant {
@@ -17,6 +18,7 @@ export interface Participant {
   hasPaid: boolean;
   paymentMethod?: "cash" | "tng" | "other";
   proofUrl?: string; // base64 data URI of payment proof screenshot
+  paidAmount?: number; // Tracks the total amount paid so far (to handle add-ons)
 }
 
 export interface Session {
@@ -26,6 +28,7 @@ export interface Session {
   owner: string; // creator's name — only they can change split mode
   paidBy: string; // participant name
   paidByPhone: string;
+  qrImage?: string; // Base64 of the uploaded payment QR code
   participants: Participant[];
   items: LineItem[];
   splitMode: "even" | "byItem";
@@ -43,13 +46,14 @@ function generateCode(): string {
   return `${word}-${suffix}`;
 }
 
-export async function createSession(creatorName: string): Promise<Session> {
+export async function createSession(creatorName: string, qrImage?: string): Promise<Session> {
   const code = generateCode();
   const session: Omit<Session, "id" | "createdAt"> = {
     code,
     owner: creatorName,
     paidBy: "",
     paidByPhone: "",
+    qrImage,
     participants: [{ name: creatorName, hasPaid: false }],
     items: [],
     splitMode: "even",

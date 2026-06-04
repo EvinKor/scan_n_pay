@@ -13,6 +13,7 @@ export default function Home() {
   const [mode, setMode] = useState<"idle" | "create" | "join">("idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [qrImage, setQrImage] = useState<string>("");
 
   // Auto-generate a random animal name on mount
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function Home() {
     if (!name.trim()) return setError("Enter your name first");
     setLoading(true);
     try {
-      const session = await createSession(name.trim());
+      const session = await createSession(name.trim(), qrImage || undefined);
       setLocalUser({ name: name.trim(), sessionId: session.id });
       router.push(`/scan?session=${session.id}`);
     } catch (e) {
@@ -31,6 +32,31 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleQRUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX = 800; // compress
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        setQrImage(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   }
 
   async function handleJoin() {
@@ -97,17 +123,45 @@ export default function Home() {
         )}
 
         {mode === "create" && (
-          <div className="space-y-3">
-            <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="w-full bg-brand text-black font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {loading ? "Creating..." : "Create & Scan Receipt →"}
-            </button>
-            <button onClick={() => setMode("idle")} className="w-full text-zinc-500 text-sm py-2">
-              ← Back
-            </button>
+          <div className="space-y-4">
+            <div>
+              <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
+                Payment QR Code (Optional)
+              </label>
+              <div className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleQRUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                {qrImage ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <img src={qrImage} alt="QR Code" className="w-16 h-16 rounded-lg object-cover" />
+                    <span className="text-brand text-xs font-semibold">QR Uploaded! (Tap to change)</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-2xl">📱</span>
+                    <span className="text-zinc-400 text-sm">Upload your TNG/DuitNow QR</span>
+                    <span className="text-zinc-600 text-xs">Guests can save & scan it to pay</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className="w-full bg-brand text-black font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loading ? "Creating..." : "Create & Scan Receipt →"}
+              </button>
+              <button onClick={() => setMode("idle")} className="w-full text-zinc-500 text-sm py-2">
+                ← Back
+              </button>
+            </div>
           </div>
         )}
 
