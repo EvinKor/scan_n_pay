@@ -246,6 +246,33 @@ export default function RoomPage() {
     setProofImage(null);
   }
 
+  async function handleRemoveParticipant(nameToRemove: string) {
+    if (!session || session.paidBy !== myName) return;
+    if (!confirm(`Are you sure you want to remove ${nameToRemove}?`)) return;
+
+    const newParticipants = session.participants.filter(p => p.name !== nameToRemove);
+    let newItems = session.items;
+
+    // Unassign them from any claimed items if in byItem mode
+    if (session.splitMode === "byItem") {
+      newItems = session.items.map(item => {
+        if (!item.assignedTo) return item;
+        
+        if (Array.isArray(item.assignedTo)) {
+          const newAssignedTo = item.assignedTo.filter((name: string) => name !== nameToRemove);
+          return { ...item, assignedTo: newAssignedTo };
+        } else {
+          const newAssignedTo = { ...item.assignedTo };
+          delete newAssignedTo[nameToRemove];
+          return { ...item, assignedTo: newAssignedTo };
+        }
+      });
+    }
+
+    await updateSession(id, { participants: newParticipants, items: newItems });
+    setSession(s => s ? { ...s, participants: newParticipants, items: newItems } : s);
+  }
+
   async function handleShare() {
     if (!session) return;
     const joinUrl = `${window.location.origin}/join/${session.code}`;
@@ -370,6 +397,18 @@ export default function RoomPage() {
                   {p.name}
                   {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                   {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
+                  {session.paidBy === myName && p.name !== myName && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveParticipant(p.name);
+                      }}
+                      className="ml-2 w-4 h-4 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                      title="Remove participant"
+                    >
+                      <span className="text-[10px] leading-none mb-0.5">✕</span>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -424,6 +463,7 @@ export default function RoomPage() {
               const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
               const totalQty = item.quantity || 1;
               const totalClaimed = assignees.reduce((sum, n) => sum + assignments[n], 0);
+              const qtyLeft = Math.max(0, totalQty - totalClaimed);
               const isFullyClaimed = totalClaimed >= totalQty;
               // Paid users can still interact with addedLater items, but not original items
               const canInteract = item.addedLater
@@ -464,6 +504,14 @@ export default function RoomPage() {
                         <span className="text-white text-sm truncate">{item.name}</span>
                         {(item.quantity ?? 1) > 1 && (
                           <span className="text-zinc-500 text-xs flex-shrink-0">×{item.quantity}</span>
+                        )}
+                        {s.splitMode === "byItem" && totalQty > 1 && (
+                          <span className={clsx(
+                            "px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0",
+                            qtyLeft > 0 ? "bg-brand/20 text-brand" : "bg-zinc-700/50 text-zinc-500"
+                          )}>
+                            {qtyLeft} left
+                          </span>
                         )}
                       </div>
                       {s.splitMode === "byItem" && assignees.length > 0 && (
@@ -695,28 +743,95 @@ export default function RoomPage() {
                     collected += p.paidAmount ?? pTotal;
                   }
                 });
+
+                let hostActualShare = myShare;
+                let unclaimedAmount = 0;
+
+                if (session.splitMode === "byItem") {
+                   let unclaimedSubtotal = 0;
+                   const totalSubtotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+                   
+                   session.items.forEach(item => {
+                     const price = Number(item.price) || 0;
+                     if (price <= 0) return;
+                     const assignments = getAssignments(item);
+                     const assignedNames = Object.keys(assignments).filter((n) => assignments[n] > 0);
+                     if (assignedNames.length === 0) {
+                       unclaimedSubtotal += price;
+                     } else {
+                       const totalClaimed = assignedNames.reduce((sum, n) => sum + assignments[n], 0);
+                       if (totalClaimed < (item.quantity || 1)) {
+                         unclaimedSubtotal += (price / (item.quantity || 1)) * ((item.quantity || 1) - totalClaimed);
+                       }
+                     }
+                   });
+
+                   if (unclaimedSubtotal > 0 && totalSubtotal > 0) {
+                     const ratioUnclaimed = unclaimedSubtotal / totalSubtotal;
+                     unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed;
+                     hostActualShare = Math.max(0, myShare - unclaimedAmount);
+                   }
+                }
                 
                 const remaining = Math.max(0, expectedToCollect - collected);
                 
+                const actualSharePct = grandTotal > 0 ? (hostActualShare / grandTotal) * 100 : 0;
+                const unclaimedPct = grandTotal > 0 ? (unclaimedAmount / grandTotal) * 100 : 0;
+                const collectedPct = grandTotal > 0 ? (collected / grandTotal) * 100 : 0;
+
+                const gradientString = `conic-gradient(
+                  #015ABF 0% ${actualSharePct}%, 
+                  #52525b ${actualSharePct}% ${actualSharePct + unclaimedPct}%, 
+                  #00C16E ${actualSharePct + unclaimedPct}% ${actualSharePct + unclaimedPct + collectedPct}%, 
+                  #fbbf24 ${actualSharePct + unclaimedPct + collectedPct}% 100%
+                )`;
+                
                 return (
                   <div className="bg-surface border border-zinc-700/50 rounded-2xl p-5 mb-4 shadow-lg">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-4 font-semibold">Your Collection Summary</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/30">
-                        <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-1">Total Bill</p>
-                        <p className="text-white font-mono font-bold text-lg">RM {grandTotal.toFixed(2)}</p>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-5 font-semibold">Your Collection Summary</p>
+                    
+                    <div className="flex items-center gap-6">
+                      {/* Donut Chart */}
+                      <div className="relative w-28 h-28 flex-shrink-0 rounded-full flex items-center justify-center" style={{ background: gradientString }}>
+                        {/* Inner Hole for Donut */}
+                        <div className="absolute inset-0 m-auto w-20 h-20 bg-surface rounded-full flex flex-col items-center justify-center shadow-inner">
+                          <span className="text-[9px] text-zinc-500 uppercase font-semibold">Total</span>
+                          <span className="text-sm font-mono font-bold text-white">RM {Math.round(grandTotal)}</span>
+                        </div>
                       </div>
-                      <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/30">
-                        <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-1">Your Share</p>
-                        <p className="text-white font-mono font-bold text-lg">RM {myShare.toFixed(2)}</p>
-                      </div>
-                      <div className="bg-brand/10 rounded-xl p-3 border border-brand/20">
-                        <p className="text-brand/80 text-[10px] uppercase tracking-wider mb-1">Collected</p>
-                        <p className="text-brand font-mono font-bold text-lg">RM {collected.toFixed(2)}</p>
-                      </div>
-                      <div className={clsx("rounded-xl p-3 border", remaining > 0 ? "bg-yellow-400/10 border-yellow-400/20" : "bg-zinc-800/50 border-zinc-700/30")}>
-                        <p className={clsx("text-[10px] uppercase tracking-wider mb-1", remaining > 0 ? "text-yellow-400/80" : "text-zinc-500")}>Left to Collect</p>
-                        <p className={clsx("font-mono font-bold text-lg", remaining > 0 ? "text-yellow-400" : "text-zinc-400")}>RM {remaining.toFixed(2)}</p>
+
+                      {/* Legend */}
+                      <div className="flex flex-col gap-3 flex-1">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-[#015ABF]" />
+                            <span className="text-zinc-400 text-xs">Your Share</span>
+                          </div>
+                          <span className="text-white font-mono text-sm font-medium">RM {hostActualShare.toFixed(2)}</span>
+                        </div>
+                        {unclaimedAmount > 0 && (
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
+                              <span className="text-zinc-500 text-xs italic">Unclaimed</span>
+                            </div>
+                            <span className="text-zinc-500 font-mono text-sm font-medium">RM {unclaimedAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-[#00C16E]" />
+                            <span className="text-zinc-400 text-xs">Collected</span>
+                          </div>
+                          <span className="text-white font-mono text-sm font-medium">RM {collected.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                            <span className="text-zinc-400 text-xs">Remaining</span>
+                          </div>
+                          <span className="text-yellow-400 font-mono text-sm font-medium">RM {remaining.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
