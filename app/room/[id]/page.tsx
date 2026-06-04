@@ -178,21 +178,39 @@ export default function RoomPage() {
     setSession((s) => s ? { ...s, participants } : s);
   }
 
-  function handleTNGPay() {
+  async function handleTNGPay() {
     if (!session) return;
     
-    // If there is a QR image, trigger download
     if (session.qrImage) {
-      const a = document.createElement("a");
-      a.href = session.qrImage;
-      a.download = `QR_${session.paidBy}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      try {
+        if (navigator.share) {
+          const res = await fetch(session.qrImage);
+          const blob = await res.blob();
+          const file = new File([blob], `QR_${session.paidBy}.jpg`, { type: "image/jpeg" });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: "Payment QR",
+            });
+          } else {
+            throw new Error("Cannot share files");
+          }
+        } else {
+          throw new Error("Share API not supported");
+        }
+      } catch (e) {
+        // Fallback for desktop/unsupported browsers
+        const a = document.createElement("a");
+        a.href = session.qrImage;
+        a.download = `QR_${session.paidBy}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     }
     
-    // Open TNG app directly (bypasses App Store region lock)
-    window.location.href = "tngd://";
+    // Open TNG app directly
+    window.location.href = "tngdwallet://client/dl/home";
   }
 
   function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
