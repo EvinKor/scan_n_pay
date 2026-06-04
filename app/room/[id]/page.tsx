@@ -178,38 +178,36 @@ export default function RoomPage() {
     setSession((s) => s ? { ...s, participants } : s);
   }
 
-  async function handleTNGPay() {
-    if (!session) return;
-    
-    if (session.qrImage) {
-      try {
-        if (navigator.share) {
-          const res = await fetch(session.qrImage);
-          const blob = await res.blob();
-          const file = new File([blob], `QR_${session.paidBy}.jpg`, { type: "image/jpeg" });
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: "Payment QR",
-            });
-          } else {
-            throw new Error("Cannot share files");
-          }
+  async function handleSaveQR() {
+    if (!session || !session.qrImage) return;
+    try {
+      if (navigator.share) {
+        const res = await fetch(session.qrImage);
+        const blob = await res.blob();
+        const file = new File([blob], `QR_${session.paidBy}.jpg`, { type: "image/jpeg" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: "Payment QR",
+          });
         } else {
-          throw new Error("Share API not supported");
+          throw new Error("Cannot share files");
         }
-      } catch (e) {
-        // Fallback for desktop/unsupported browsers
-        const a = document.createElement("a");
-        a.href = session.qrImage;
-        a.download = `QR_${session.paidBy}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      } else {
+        throw new Error("Share API not supported");
       }
+    } catch (e) {
+      // Fallback for desktop/unsupported browsers
+      const a = document.createElement("a");
+      a.href = session.qrImage;
+      a.download = `QR_${session.paidBy}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
-    
-    // Open TNG app directly
+  }
+
+  function handleTNGPay() {
     window.location.href = "tngdwallet://client/dl/home";
   }
 
@@ -684,10 +682,49 @@ export default function RoomPage() {
           {amIPayer ? (
             // Payer view — see who's paid
             <div className="space-y-4">
+              {(() => {
+                const myShare = totals?.[myName] ?? 0;
+                let collected = 0;
+                let expectedToCollect = 0;
+                
+                session.participants.forEach(p => {
+                  if (p.name === myName) return;
+                  const pTotal = totals?.[p.name] ?? 0;
+                  expectedToCollect += pTotal;
+                  if (p.hasPaid) {
+                    collected += p.paidAmount ?? pTotal;
+                  }
+                });
+                
+                const remaining = Math.max(0, expectedToCollect - collected);
+                
+                return (
+                  <div className="bg-surface border border-zinc-700/50 rounded-2xl p-5 mb-4 shadow-lg">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-4 font-semibold">Your Collection Summary</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/30">
+                        <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-1">Total Bill</p>
+                        <p className="text-white font-mono font-bold text-lg">RM {grandTotal.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/30">
+                        <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-1">Your Share</p>
+                        <p className="text-white font-mono font-bold text-lg">RM {myShare.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-brand/10 rounded-xl p-3 border border-brand/20">
+                        <p className="text-brand/80 text-[10px] uppercase tracking-wider mb-1">Collected</p>
+                        <p className="text-brand font-mono font-bold text-lg">RM {collected.toFixed(2)}</p>
+                      </div>
+                      <div className={clsx("rounded-xl p-3 border", remaining > 0 ? "bg-yellow-400/10 border-yellow-400/20" : "bg-zinc-800/50 border-zinc-700/30")}>
+                        <p className={clsx("text-[10px] uppercase tracking-wider mb-1", remaining > 0 ? "text-yellow-400/80" : "text-zinc-500")}>Left to Collect</p>
+                        <p className={clsx("font-mono font-bold text-lg", remaining > 0 ? "text-yellow-400" : "text-zinc-400")}>RM {remaining.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
               <div className="bg-surface rounded-2xl p-4">
-                <p className="text-zinc-400 text-sm mb-3">
-                  You paid the bill. Waiting for others to pay you back.
-                </p>
+                <p className="text-zinc-400 text-xs uppercase tracking-wide mb-3">Participant Status</p>
                 <div className="space-y-3">
                   {session.participants
                     .filter((p) => p.name !== session.paidBy)
@@ -1108,16 +1145,24 @@ export default function RoomPage() {
                       {session.qrImage && (
                         <div className="bg-surface border border-zinc-700 rounded-2xl p-4 flex flex-col items-center text-center">
                           <img src={session.qrImage} alt="Payment QR" className="w-48 h-48 rounded-xl object-contain mb-3" />
-                          <p className="text-zinc-400 text-sm mb-1">Host's Payment QR</p>
+                          <p className="text-zinc-400 text-sm mb-4">Host's Payment QR</p>
+                          <button
+                            onClick={handleSaveQR}
+                            className="w-full bg-zinc-800 text-zinc-200 border border-zinc-600 font-bold rounded-xl py-3 text-sm flex items-center justify-center gap-2 hover:bg-zinc-700 active:scale-95 transition-all"
+                          >
+                            <span className="text-lg">📥</span>
+                            1. Save QR to Photos
+                          </button>
                         </div>
                       )}
+                      
                       <button
                         onClick={handleTNGPay}
                         className="w-full bg-[#015ABF] text-white font-bold rounded-2xl py-4 text-base flex flex-col items-center justify-center gap-1 hover:bg-[#0147a0] active:scale-95 transition-all"
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-xl">💚</span>
-                          {session.qrImage ? "Save QR & Open TNG" : "Open TNG"}
+                          {session.qrImage ? "2. Open TNG App" : "Open TNG App"}
                         </div>
                         <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
                       </button>
