@@ -191,15 +191,8 @@ export default function RoomPage() {
       document.body.removeChild(a);
     }
     
-    // Open TNG app
-    window.location.href = "tngd://";
-    
-    // Fallback if app doesn't open
-    setTimeout(() => {
-      if (document.visibilityState === "visible") {
-        window.open("https://tngdigital.com.my/", "_blank");
-      }
-    }, 1500);
+    // Open TNG app via App Store Link (which auto-launches if installed on iOS)
+    window.location.href = "https://apps.apple.com/my/app/touch-n-go-ewallet/id1343446791";
   }
 
   function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1110,6 +1103,21 @@ export default function RoomPage() {
                         </div>
                         <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
                       </button>
+
+                      {session.paidByPhone && (
+                        <button
+                          onClick={(e) => {
+                            navigator.clipboard.writeText(session.paidByPhone);
+                            const btn = e.currentTarget;
+                            const original = btn.innerText;
+                            btn.innerText = "Copied!";
+                            setTimeout(() => (btn.innerText = original), 2000);
+                          }}
+                          className="w-full bg-surface border border-zinc-700 hover:bg-zinc-800 text-zinc-300 font-medium rounded-xl py-3 text-sm active:scale-95 transition-all"
+                        >
+                          📋 Copy Phone Number ({session.paidByPhone})
+                        </button>
+                      )}
                     </div>
                   )}
 
