@@ -139,9 +139,41 @@ function blobToBase64(blob: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
-      // Strip the "data:image/...;base64," prefix
-      const base64 = dataUrl.split(",")[1] || "";
-      resolve(base64);
+      
+      // Compress the image before returning base64 to avoid busting API size limits
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_DIMENSION = 1600; // Good balance for OCR accuracy and size
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIMENSION) / width);
+            width = MAX_DIMENSION;
+          } else {
+            width = Math.round((width * MAX_DIMENSION) / height);
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          const base64 = compressedDataUrl.split(",")[1] || "";
+          resolve(base64);
+        } else {
+          // Fallback if canvas context fails
+          const base64 = dataUrl.split(",")[1] || "";
+          resolve(base64);
+        }
+      };
+      img.onerror = () => reject(new Error("Failed to read image file"));
+      img.src = dataUrl;
     };
     reader.onerror = () => reject(new Error("Failed to read image file"));
     reader.readAsDataURL(blob);
@@ -264,6 +296,7 @@ function parseReceiptText(text: string): ReceiptResult {
   let serviceCharge = 0;
   let sst = 0;
   let receiptTotal = 0;
+  let lastUnpricedLine = "";
 
   // Patterns for special lines
   const serviceChargePattern =
@@ -283,7 +316,7 @@ function parseReceiptText(text: string): ReceiptResult {
   const metadataPattern =
     /(?:receipt|thank\s*you|welcome|table\s*[:.]|bill\s*no|invoice|pax\s*[:.]|tel\s*[:.]|phone|address|date\s*[:.]|time\s*[:.]|cashier|server\s*[:.]|order\s*(?:no|id)|dine.?in|take.?away|member|card\s*(?:no|type)|ref\s*no|trx\s*no|terminal|merchant|approved|sst\s*id|debit|credit\s*card)/i;
   const paymentLinePattern =
-    /^(?:change|cash|visa|master(?:card)?|debit|credit|payment|tender|paid|balance|card\s*no|card\s*type|approved\s*amount)\b/i;
+    /(?:\bchange\b|\bcash\b|\bvisa\b|\bmaster(?:card)?\b|\bdebit\b|\bcredit\b|\bpayment\b|\btender\b|\bpaid\b|\bbalance\b|card\s*no|card\s*type|approved|amount\s*[:\[])/i;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -294,14 +327,21 @@ function parseReceiptText(text: string): ReceiptResult {
     // Extract RM price from the line
     const price = extractRMPrice(line);
 
-    // If no RM price found, check if it's a modifier line (e.g. ":Soba", ":Cold")
+    // If no RM price found, check if it's a modifier line (e.g. ":Soba", ":Cold") or save as item name
     if (price === null) {
-      // Modifier lines — append to previous item name
-      if (/^[:;]/.test(line) && items.length > 0) {
+      if (/^[:;]/.test(line)) {
+        // Modifier lines — append to previous item name
         const modifier = line.replace(/^[:;]\s*/, "").trim();
         if (modifier) {
-          items[items.length - 1].name += ` (${modifier})`;
+          if (lastUnpricedLine) {
+            lastUnpricedLine += ` (${modifier})`;
+          } else if (items.length > 0) {
+            items[items.length - 1].name += ` (${modifier})`;
+          }
         }
+      } else if (!metadataPattern.test(line) && /[a-zA-Z]/.test(line)) {
+        // Save as a potential item name if it has letters and is not metadata
+        lastUnpricedLine = line;
       }
       continue;
     }
@@ -312,47 +352,84 @@ function parseReceiptText(text: string): ReceiptResult {
     // Now classify the line
     const cleanedLine = line.replace(/\s+/g, " ").trim();
 
+    // Extract the item name and quantity from the line
+    let { name: itemName, quantity } = extractItemNameAndQty(cleanedLine);
+    
+    // If we only found a price and quantity (e.g. "1 RM16.90") but no name, 
+    // it was likely split across lines by the OCR.
+    if (!itemName || !/[a-zA-Z]/.test(itemName)) {
+      if (lastUnpricedLine) {
+        itemName = lastUnpricedLine;
+        lastUnpricedLine = ""; // Consume it
+        
+        // If the unpriced line had a leading quantity (e.g. "2 N21 Salmon..."), use it
+        const qtyMatch = itemName.match(/^(\d{1,2})\s+/);
+        if (qtyMatch && quantity === 1) {
+          quantity = parseInt(qtyMatch[1], 10);
+          itemName = itemName.replace(/^\d{1,2}\s+/, "");
+        }
+      } else {
+        // Look ahead to the NEXT line if we didn't have one buffered
+        for (let j = i + 1; j <= Math.min(lines.length - 1, i + 2); j++) {
+          const nextLine = lines[j].trim();
+          if (extractRMPrice(nextLine) === null && !metadataPattern.test(nextLine) && /[a-zA-Z]/.test(nextLine)) {
+             itemName = nextLine;
+             const qtyMatch = itemName.match(/^(\d{1,2})\s+/);
+             if (qtyMatch && quantity === 1) { 
+                quantity = parseInt(qtyMatch[1], 10);
+                itemName = itemName.replace(/^\d{1,2}\s+/, "");
+             }
+             lines[j] = ""; // Clear it so we don't process it again
+             break;
+          }
+        }
+      }
+    } else {
+      lastUnpricedLine = ""; // We successfully parsed a full line, clear buffer
+    }
+
+    // Now classify the resolved item name + line
+    const textToClassify = (itemName + " " + cleanedLine).toLowerCase();
+
     // Check for service charge
-    if (serviceChargePattern.test(cleanedLine)) {
+    if (serviceChargePattern.test(textToClassify)) {
       serviceCharge = price;
       continue;
     }
 
     // Check for SST / gov service tax
-    if (taxPattern.test(cleanedLine)) {
+    if (taxPattern.test(textToClassify)) {
       sst = price;
       continue;
     }
 
     // Check for total (but not subtotal) — check before rounding since
     // "Total after Rounding" contains both keywords
-    if (totalPattern.test(cleanedLine) && !subtotalPattern.test(cleanedLine)) {
+    if (totalPattern.test(textToClassify) && !subtotalPattern.test(textToClassify)) {
       receiptTotal = price;
       continue;
     }
 
     // Check for rounding adjustment — skip
-    if (roundingPattern.test(cleanedLine)) {
+    if (roundingPattern.test(textToClassify)) {
       continue;
     }
 
     // Check for subtotal — skip
-    if (subtotalPattern.test(cleanedLine)) {
+    if (subtotalPattern.test(textToClassify)) {
       continue;
     }
 
     // Skip metadata lines that happen to have a price
-    if (metadataPattern.test(cleanedLine)) {
+    if (metadataPattern.test(textToClassify)) {
       continue;
     }
 
     // Skip payment lines
-    if (paymentLinePattern.test(cleanedLine)) {
+    if (paymentLinePattern.test(textToClassify)) {
       continue;
     }
 
-    // Extract the item name and quantity from the line
-    const { name: itemName, quantity } = extractItemNameAndQty(cleanedLine);
     if (!itemName || itemName.length < 2) continue;
 
     // Must contain at least one alphabetic character
@@ -384,8 +461,8 @@ function parseReceiptText(text: string): ReceiptResult {
  * Also handles OCR misreadings: RMO.00 (O instead of 0), RM1S.90 (S instead of 5)
  */
 function extractRMPrice(line: string): number | null {
-  // Match RM followed by optional space, then digits/OCR-letters with optional decimal
-  const rmPattern = /RM\s*([0-9Oo]{1,6}(?:\.[0-9Oo]{1,2})?)/gi;
+  // Match RM followed by optional space, then digits/OCR-letters with optional decimal or comma
+  const rmPattern = /RM\s*([0-9Oo]{1,6}(?:[.,][0-9Oo]{1,2})?)/gi;
   let lastMatch: RegExpExecArray | null = null;
   let match: RegExpExecArray | null = null;
   while ((match = rmPattern.exec(line)) !== null) {
@@ -396,7 +473,8 @@ function extractRMPrice(line: string): number | null {
 
   // Fix common OCR misreadings in the price digits
   const cleaned = lastMatch[1]
-    .replace(/[Oo]/g, "0");
+    .replace(/[Oo]/g, "0")
+    .replace(/,/g, ".");
 
   const val = parseFloat(cleaned);
   if (isNaN(val)) return null;
