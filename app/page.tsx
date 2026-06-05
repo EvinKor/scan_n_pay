@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSession, joinSession } from "@/lib/session";
-import { setLocalUser } from "@/lib/identity";
+import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
 import { generateAnimalName } from "@/lib/animals";
 
 export default function Home() {
@@ -26,6 +26,7 @@ export default function Home() {
     try {
       const session = await createSession(name.trim(), qrImage || undefined);
       setLocalUser({ name: name.trim(), sessionId: session.id });
+      setLocalUserForRoom(session.id, name.trim());
       router.push(`/scan?session=${session.id}`);
     } catch (e) {
       setError("Failed to create session. Try again.");
@@ -66,6 +67,7 @@ export default function Home() {
     try {
       const session = await joinSession(code.trim().toUpperCase(), name.trim());
       setLocalUser({ name: name.trim(), sessionId: session.id });
+      setLocalUserForRoom(session.id, name.trim());
       router.push(`/room/${session.id}`);
     } catch (e: any) {
       setError(e.message || "Room not found. Check the code.");

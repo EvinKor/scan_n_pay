@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getSessionByCode, joinSession } from "@/lib/session";
-import { setLocalUser } from "@/lib/identity";
+import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
 import { generateAnimalName } from "@/lib/animals";
 
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const claimAs = searchParams.get("as"); // e.g. /join/MAKAN-7X2?as=CozyPanda
 
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,6 +18,7 @@ export default function JoinPage() {
   const [error, setError] = useState("");
   const [roomExists, setRoomExists] = useState(false);
   const [participantNames, setParticipantNames] = useState<string[]>([]);
+  const [claimMode, setClaimMode] = useState(false); // true when using ?as= link
 
   // Check if room exists & generate animal name
   useEffect(() => {
@@ -30,7 +33,14 @@ export default function JoinPage() {
         setRoomExists(true);
         const existingNames = session.participants.map((p) => p.name);
         setParticipantNames(existingNames);
-        setName(generateAnimalName(existingNames));
+
+        // If ?as=Name is provided and that name exists in the room, auto-claim
+        if (claimAs && existingNames.includes(claimAs)) {
+          setName(claimAs);
+          setClaimMode(true);
+        } else {
+          setName(generateAnimalName(existingNames));
+        }
       } catch {
         setError("Failed to check room. Try again.");
       } finally {
@@ -38,7 +48,7 @@ export default function JoinPage() {
       }
     }
     check();
-  }, [code]);
+  }, [code, claimAs]);
 
   async function handleJoin() {
     if (!name.trim()) return setError("Enter a name first");
@@ -47,6 +57,7 @@ export default function JoinPage() {
     try {
       const session = await joinSession(code.toUpperCase(), name.trim());
       setLocalUser({ name: name.trim(), sessionId: session.id });
+      setLocalUserForRoom(session.id, name.trim());
       router.push(`/room/${session.id}`);
     } catch (e: any) {
       setError(e.message || "Failed to join. Try again.");
@@ -92,7 +103,7 @@ export default function JoinPage() {
           <span className="text-3xl">🧾</span>
         </div>
         <h1 className="text-2xl font-bold font-mono text-white tracking-tight">
-          Join SplitLah
+          {claimMode ? "Claim Your Spot" : "Join SplitLah"}
         </h1>
         <p className="text-zinc-400 mt-1 text-sm">
           Room: <span className="text-brand font-mono tracking-widest">{code}</span>
@@ -107,23 +118,36 @@ export default function JoinPage() {
             {getAnimalEmoji(name)}
           </div>
           <p className="text-white font-semibold text-lg mb-1">{name}</p>
-          <p className="text-zinc-500 text-xs">Your auto-generated name</p>
+          <p className="text-zinc-500 text-xs">
+            {claimMode
+              ? "The host pre-created this spot for you"
+              : "Your auto-generated name"}
+          </p>
         </div>
 
-        {/* Editable name */}
-        <div>
-          <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
-            Change your name (optional)
-          </label>
-          <input
-            type="text"
-            placeholder="Your display name"
-            value={name}
-            onChange={(e) => { setName(e.target.value); setError(""); }}
-            className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
-            maxLength={24}
-          />
-        </div>
+        {/* Editable name — hide in claim mode since the name is fixed */}
+        {!claimMode && (
+          <div>
+            <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
+              Change your name (optional)
+            </label>
+            <input
+              type="text"
+              placeholder="Your display name"
+              value={name}
+              onChange={(e) => { setName(e.target.value); setError(""); }}
+              className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
+              maxLength={24}
+            />
+          </div>
+        )}
+
+        {claimMode && (
+          <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center">
+            <p className="text-brand text-sm">✨ The host already selected your items for you!</p>
+            <p className="text-zinc-400 text-xs mt-1">Tap below to jump into the room</p>
+          </div>
+        )}
 
         <button
           onClick={handleJoin}
@@ -135,6 +159,8 @@ export default function JoinPage() {
               <span className="w-5 h-5 rounded-full border-2 border-black border-t-transparent animate-spin" />
               Joining…
             </span>
+          ) : claimMode ? (
+            "Join as " + name + " →"
           ) : (
             "Join Room →"
           )}

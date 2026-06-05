@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractReceiptItems, ReceiptResult } from "@/lib/ocr";
 import { getSession, updateSession, LineItem, Session } from "@/lib/session";
-import { getLocalUser } from "@/lib/identity";
+import { getLocalUser, getLocalUserForRoom } from "@/lib/identity";
 import { customAlphabet } from "nanoid";
 import clsx from "clsx";
 

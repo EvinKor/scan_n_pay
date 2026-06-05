@@ -12,7 +12,8 @@ import {
   getAssignments,
   getItemShare,
 } from "@/lib/session";
-import { getLocalUser } from "@/lib/identity";
+import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom } from "@/lib/identity";
+import { generateAnimalName } from "@/lib/animals";
 
 import clsx from "clsx";
 
@@ -21,7 +22,6 @@ type Tab = "split" | "pay";
 export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const user = getLocalUser();
 
   const [session, setSession] = useState<Session | null>(null);
   const [tab, setTab] = useState<Tab>("split");
@@ -38,11 +38,31 @@ export default function RoomPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemQty, setNewItemQty] = useState(1);
 
-  const myName = user?.name || "";
+  // Acting-as proxy (owner can act on behalf of someone)
+  const [actingAs, setActingAs] = useState<string | null>(null);
+  // Add friend state
+  const [isAddingFriend, setIsAddingFriend] = useState(false);
+  const [newFriendName, setNewFriendName] = useState("");
+  const [friendLinkCopied, setFriendLinkCopied] = useState<string | null>(null);
+
+  // Per-room identity
+  const roomUser = getLocalUserForRoom(id);
+  const legacyUser = getLocalUser();
+  const myName = roomUser || legacyUser?.name || "";
 
   // Load + subscribe
   useEffect(() => {
-    if (!user) { router.push("/"); return; }
+    if (!myName) {
+      // No identity for this room — redirect to join page
+      getSession(id).then((s) => {
+        if (s) {
+          router.push(`/join/${s.code}`);
+        } else {
+          router.push("/");
+        }
+      });
+      return;
+    }
 
     getSession(id).then((s) => {
       if (!s) { router.push("/"); return; }
@@ -69,6 +89,8 @@ export default function RoomPage() {
   }, [id]);
 
   const isOwner = session?.owner === myName;
+  // When the owner is acting on behalf of someone, effectiveName is that person
+  const effectiveName = (isOwner && actingAs) ? actingAs : myName;
 
   async function setSplitMode(mode: "even" | "byItem") {
     if (!session || !isOwner) return; // only owner can change
@@ -90,7 +112,7 @@ export default function RoomPage() {
       name: newItemName.trim(),
       quantity: newItemQty,
       price: price,
-      assignedTo: { [myName]: newItemQty },
+      assignedTo: { [effectiveName]: newItemQty },
       addedLater: true,
     };
     
@@ -110,17 +132,18 @@ export default function RoomPage() {
     if (!session || session.splitMode !== "byItem") return;
     const item = session.items.find(i => i.id === itemId);
     if (!item) return;
-    // If user has paid, they can only interact with addedLater items
-    if (myParticipant?.hasPaid && !item.addedLater) return;
+    const targetParticipant = session.participants.find(p => p.name === effectiveName);
+    // If target user has paid, they can only interact with addedLater items
+    if (targetParticipant?.hasPaid && !item.addedLater) return;
 
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
-      const alreadyHas = (assignments[myName] || 0) > 0;
+      const alreadyHas = (assignments[effectiveName] || 0) > 0;
       if (alreadyHas) {
-        delete assignments[myName];
+        delete assignments[effectiveName];
       } else {
-        assignments[myName] = 1;
+        assignments[effectiveName] = 1;
       }
       return {
         ...item,
@@ -136,17 +159,18 @@ export default function RoomPage() {
     if (!session || session.splitMode !== "byItem") return;
     const item = session.items.find(i => i.id === itemId);
     if (!item) return;
-    // If user has paid, they can only interact with addedLater items
-    if (myParticipant?.hasPaid && !item.addedLater) return;
+    const targetParticipant = session.participants.find(p => p.name === effectiveName);
+    // If target user has paid, they can only interact with addedLater items
+    if (targetParticipant?.hasPaid && !item.addedLater) return;
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
-      const current = assignments[myName] || 0;
+      const current = assignments[effectiveName] || 0;
       const next = current + delta;
       if (next <= 0) {
-        delete assignments[myName];
+        delete assignments[effectiveName];
       } else {
-        assignments[myName] = Math.min(next, item.quantity);
+        assignments[effectiveName] = Math.min(next, item.quantity);
       }
       return {
         ...item,
@@ -299,6 +323,36 @@ export default function RoomPage() {
     }
   }
 
+  async function handleAddFriend() {
+    if (!session || !newFriendName.trim()) return;
+    const trimmed = newFriendName.trim();
+    // Check for duplicate name
+    if (session.participants.some(p => p.name === trimmed)) {
+      alert(`"${trimmed}" is already in the room!`);
+      return;
+    }
+    const newParticipants = [...session.participants, { name: trimmed, hasPaid: false }];
+    await updateSession(id, { participants: newParticipants });
+    setSession(s => s ? { ...s, participants: newParticipants } : s);
+    setNewFriendName("");
+    setIsAddingFriend(false);
+    // Auto-switch to acting as the new friend so the owner can select items
+    setActingAs(trimmed);
+  }
+
+  async function copyClaimLink(participantName: string) {
+    if (!session) return;
+    const claimUrl = `${window.location.origin}/join/${session.code}?as=${encodeURIComponent(participantName)}`;
+    try {
+      await navigator.clipboard.writeText(claimUrl);
+      setFriendLinkCopied(participantName);
+      setTimeout(() => setFriendLinkCopied(null), 2000);
+    } catch {
+      // fallback
+      prompt("Copy this link:", claimUrl);
+    }
+  }
+
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -328,6 +382,11 @@ export default function RoomPage() {
       <div className="px-4 pt-8 pb-4">
         <div className="mb-4 inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
           👤 Playing as <span className="font-bold">{myName}</span>
+          {actingAs && (
+            <span className="bg-yellow-400/20 text-yellow-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              Acting as {actingAs}
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-bold font-mono">{session.code}</h1>
@@ -386,7 +445,7 @@ export default function RoomPage() {
                 <div
                   key={p.name}
                   className={clsx(
-                    "px-3 py-1.5 rounded-xl text-sm font-medium",
+                    "px-3 py-1.5 rounded-xl text-sm font-medium flex items-center gap-1",
                     p.name === session.paidBy
                       ? "bg-brand/20 text-brand border border-brand/30"
                       : p.name === myName
@@ -397,22 +456,108 @@ export default function RoomPage() {
                   {p.name}
                   {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                   {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
-                  {session.paidBy === myName && p.name !== myName && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveParticipant(p.name);
-                      }}
-                      className="ml-2 w-4 h-4 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
-                      title="Remove participant"
-                    >
-                      <span className="text-[10px] leading-none mb-0.5">✕</span>
-                    </button>
+                  {/* Owner controls: claim link & remove */}
+                  {isOwner && p.name !== myName && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyClaimLink(p.name);
+                        }}
+                        className="ml-1 text-[10px] text-zinc-500 hover:text-brand transition-colors"
+                        title="Copy claim link for this person"
+                      >
+                        {friendLinkCopied === p.name ? "✅" : "🔗"}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveParticipant(p.name);
+                        }}
+                        className="w-4 h-4 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                        title="Remove participant"
+                      >
+                        <span className="text-[10px] leading-none mb-0.5">✕</span>
+                      </button>
+                    </>
                   )}
                 </div>
               ))}
+
+              {/* Add Friend button (owner only) */}
+              {isOwner && !isAddingFriend && (
+                <button
+                  onClick={() => {
+                    setNewFriendName(generateAnimalName(session.participants.map(p => p.name)));
+                    setIsAddingFriend(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-sm font-medium border border-dashed border-zinc-600 text-zinc-400 hover:border-brand hover:text-brand transition-colors"
+                >
+                  + Add friend
+                </button>
+              )}
             </div>
+
+            {/* Add Friend inline form */}
+            {isOwner && isAddingFriend && (
+              <div className="mt-3 bg-surface rounded-xl p-3 border border-zinc-700/50 space-y-2">
+                <p className="text-zinc-400 text-xs">Create a participant on their behalf:</p>
+                <input
+                  type="text"
+                  placeholder="Friend's name"
+                  value={newFriendName}
+                  onChange={(e) => setNewFriendName(e.target.value)}
+                  className="w-full bg-muted border border-zinc-700/50 rounded-lg px-3 py-2 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
+                  maxLength={24}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddFriend(); }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddFriend}
+                    disabled={!newFriendName.trim()}
+                    className="flex-1 bg-brand text-black text-sm font-semibold py-2 rounded-lg disabled:opacity-50 hover:bg-opacity-90 transition-all"
+                  >
+                    Add & Select Items for Them
+                  </button>
+                  <button
+                    onClick={() => { setIsAddingFriend(false); setNewFriendName(""); }}
+                    className="px-3 bg-zinc-800 text-zinc-300 text-sm py-2 rounded-lg hover:bg-zinc-700 transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Acting As selector (owner only, byItem mode) */}
+          {isOwner && session.splitMode === "byItem" && session.participants.length > 1 && (
+            <div className="bg-surface border border-zinc-700/50 rounded-xl p-3">
+              <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-2 font-semibold">Selecting items as</p>
+              <div className="flex flex-wrap gap-2">
+                {session.participants.map((p) => (
+                  <button
+                    key={p.name}
+                    onClick={() => setActingAs(p.name === myName ? null : p.name)}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                      effectiveName === p.name
+                        ? "bg-brand text-black"
+                        : "bg-muted text-zinc-400 hover:text-white"
+                    )}
+                  >
+                    {p.name === myName ? `${p.name} (you)` : p.name}
+                  </button>
+                ))}
+              </div>
+              {actingAs && (
+                <p className="text-yellow-400 text-xs mt-2 flex items-center gap-1">
+                  ⚠️ Tapping items will assign them to <span className="font-bold">{actingAs}</span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Split mode — owner only */}
           <div>
@@ -458,18 +603,19 @@ export default function RoomPage() {
 
             function renderItemRow(item: LineItem) {
               const assignments = getAssignments(item);
-              const isMine = (assignments[myName] || 0) > 0;
-              const myClaimedQty = assignments[myName] || 0;
+              const isMine = (assignments[effectiveName] || 0) > 0;
+              const myClaimedQty = assignments[effectiveName] || 0;
               const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
               const totalQty = item.quantity || 1;
               const totalClaimed = assignees.reduce((sum, n) => sum + assignments[n], 0);
               const qtyLeft = Math.max(0, totalQty - totalClaimed);
               const isFullyClaimed = totalClaimed >= totalQty;
+              const effectiveParticipant = s.participants.find(p => p.name === effectiveName);
               // Paid users can still interact with addedLater items, but not original items
               const canInteract = item.addedLater
                 ? (isMine || !isFullyClaimed)
-                : (!myParticipant?.hasPaid && (isMine || !isFullyClaimed));
-              const myShare = getItemShare(item, myName, s.participants.length, isLocked, s.paidBy);
+                : (!effectiveParticipant?.hasPaid && (isMine || !isFullyClaimed));
+              const myShare = getItemShare(item, effectiveName, s.participants.length, isLocked, s.paidBy);
 
               return (
                 <div
@@ -672,6 +818,14 @@ export default function RoomPage() {
               </div>
             );
           })()}
+
+          {/* Split Evenly Label */}
+          {session.splitMode === "even" && session.participants.length > 0 && (
+            <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center">
+              <p className="text-brand text-sm font-medium">⚖️ Total bill is split equally</p>
+              <p className="text-brand font-bold mt-1 text-lg font-mono">RM {(grandTotal / session.participants.length).toFixed(2)} <span className="text-xs font-normal">/ person</span></p>
+            </div>
+          )}
 
           {/* Summary */}
           <div className="bg-surface rounded-2xl p-4 space-y-2">
