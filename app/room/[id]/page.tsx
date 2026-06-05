@@ -888,6 +888,16 @@ export default function RoomPage() {
                               <span className="font-mono text-sm text-white font-semibold">
                                 RM {(totals?.[p.name] ?? 0).toFixed(2)}
                               </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveParticipant(p.name);
+                                }}
+                                className="ml-1 w-5 h-5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                                title="Remove participant"
+                              >
+                                <span className="text-[12px] leading-none mb-0.5">✕</span>
+                              </button>
                             </div>
                           </div>
                           {/* Item breakdown */}
