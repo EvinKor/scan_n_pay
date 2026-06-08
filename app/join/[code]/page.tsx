@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getSessionByCode, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
-import { generateAnimalName } from "@/lib/animals";
+
 
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>();
@@ -38,8 +38,6 @@ export default function JoinPage() {
         if (claimAs && existingNames.includes(claimAs)) {
           setName(claimAs);
           setClaimMode(true);
-        } else {
-          setName(generateAnimalName(existingNames));
         }
       } catch {
         setError("Failed to check room. Try again.");

@@ -139,45 +139,45 @@ function blobToBase64(blob: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
-      
+
       // Compress the image before returning base64 to avoid busting API size limits
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_DIMENSION = 1600; // Good balance for OCR accuracy and size
-        let width = img.width;
-        let height = img.height;
+                      img.onload = () => {
+                        const canvas = document.createElement("canvas");
+                        const MAX_DIMENSION = 1600; // Good balance for OCR accuracy and size
+                        let width = img.width;
+                        let height = img.height;
 
-        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIMENSION) / width);
-            width = MAX_DIMENSION;
-          } else {
-            width = Math.round((width * MAX_DIMENSION) / height);
-            height = MAX_DIMENSION;
-          }
-        }
+                        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                          if (width > height) {
+                            height = Math.round((height * MAX_DIMENSION) / width);
+                            width = MAX_DIMENSION;
+                          } else {
+                            width = Math.round((width * MAX_DIMENSION) / height);
+                            height = MAX_DIMENSION;
+                          }
+                        }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-          const base64 = compressedDataUrl.split(",")[1] || "";
-          resolve(base64);
-        } else {
-          // Fallback if canvas context fails
-          const base64 = dataUrl.split(",")[1] || "";
-          resolve(base64);
-        }
-      };
-      img.onerror = () => reject(new Error("Failed to read image file"));
-      img.src = dataUrl;
-    };
-    reader.onerror = () => reject(new Error("Failed to read image file"));
-    reader.readAsDataURL(blob);
-  });
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext("2d");
+                        if (ctx) {
+                          ctx.drawImage(img, 0, 0, width, height);
+                          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                          const base64 = compressedDataUrl.split(",")[1] || "";
+                          resolve(base64);
+                        } else {
+                          // Fallback if canvas context fails
+                          const base64 = dataUrl.split(",")[1] || "";
+                          resolve(base64);
+                        }
+                      };
+                      img.onerror = () => reject(new Error("Failed to read image file"));
+                      img.src = dataUrl;
+                    };
+                    reader.onerror = () => reject(new Error("Failed to read image file"));
+                    reader.readAsDataURL(blob);
+                  });
 }
 
 /**
@@ -354,14 +354,14 @@ function parseReceiptText(text: string): ReceiptResult {
 
     // Extract the item name and quantity from the line
     let { name: itemName, quantity } = extractItemNameAndQty(cleanedLine);
-    
+
     // If we only found a price and quantity (e.g. "1 RM16.90") but no name, 
     // it was likely split across lines by the OCR.
     if (!itemName || !/[a-zA-Z]/.test(itemName)) {
       if (lastUnpricedLine) {
         itemName = lastUnpricedLine;
         lastUnpricedLine = ""; // Consume it
-        
+
         // If the unpriced line had a leading quantity (e.g. "2 N21 Salmon..."), use it
         const qtyMatch = itemName.match(/^(\d{1,2})\s+/);
         if (qtyMatch && quantity === 1) {
@@ -373,14 +373,14 @@ function parseReceiptText(text: string): ReceiptResult {
         for (let j = i + 1; j <= Math.min(lines.length - 1, i + 2); j++) {
           const nextLine = lines[j].trim();
           if (extractRMPrice(nextLine) === null && !metadataPattern.test(nextLine) && /[a-zA-Z]/.test(nextLine)) {
-             itemName = nextLine;
-             const qtyMatch = itemName.match(/^(\d{1,2})\s+/);
-             if (qtyMatch && quantity === 1) { 
-                quantity = parseInt(qtyMatch[1], 10);
-                itemName = itemName.replace(/^\d{1,2}\s+/, "");
-             }
-             lines[j] = ""; // Clear it so we don't process it again
-             break;
+            itemName = nextLine;
+            const qtyMatch = itemName.match(/^(\d{1,2})\s+/);
+            if (qtyMatch && quantity === 1) {
+              quantity = parseInt(qtyMatch[1], 10);
+              itemName = itemName.replace(/^\d{1,2}\s+/, "");
+            }
+            lines[j] = ""; // Clear it so we don't process it again
+            break;
           }
         }
       }

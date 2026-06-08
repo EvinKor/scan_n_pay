@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSession, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
-import { generateAnimalName } from "@/lib/animals";
 
 export default function Home() {
   const router = useRouter();
@@ -15,10 +14,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [qrImage, setQrImage] = useState<string>("");
 
-  // Auto-generate a random animal name on mount
-  useEffect(() => {
-    setName(generateAnimalName());
-  }, []);
+
 
   async function handleCreate() {
     if (!name.trim()) return setError("Enter your name first");
@@ -97,7 +93,7 @@ export default function Home() {
           </label>
           <input
             type="text"
-            placeholder="Auto-generated — feel free to change!"
+            placeholder="Your display name"
             value={name}
             onChange={(e) => { setName(e.target.value); setError(""); }}
             className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"

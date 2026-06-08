@@ -13,7 +13,7 @@ import {
   getItemShare,
 } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom } from "@/lib/identity";
-import { generateAnimalName } from "@/lib/animals";
+import { getAnimalIcon } from "@/lib/animals";
 
 import clsx from "clsx";
 
@@ -167,10 +167,15 @@ export default function RoomPage() {
       const assignments = { ...getAssignments(item) };
       const current = assignments[effectiveName] || 0;
       const next = current + delta;
+      const totalClaimedOthers = Object.entries(assignments)
+        .filter(([name]) => name !== effectiveName)
+        .reduce((sum, [, qty]) => sum + qty, 0);
+      const maxAvailableForMe = Math.max(0, item.quantity - totalClaimedOthers);
+      
       if (next <= 0) {
         delete assignments[effectiveName];
       } else {
-        assignments[effectiveName] = Math.min(next, item.quantity);
+        assignments[effectiveName] = Math.min(next, maxAvailableForMe);
       }
       return {
         ...item,
@@ -233,6 +238,18 @@ export default function RoomPage() {
 
   function handleTNGPay() {
     window.location.href = "tngdwallet://client/dl/home";
+  }
+
+  async function handleDeleteAddedItem(itemId: string) {
+    if (!session) return;
+    const item = session.items.find(i => i.id === itemId);
+    if (!item || !item.addedLater) return;
+
+    if (!confirm(`Are you sure you want to delete ${item.name}?`)) return;
+
+    const newItems = session.items.filter(i => i.id !== itemId);
+    await updateSession(id, { items: newItems });
+    setSession(s => s ? { ...s, items: newItems } : s);
   }
 
   function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -372,7 +389,9 @@ export default function RoomPage() {
     const hasUnpaidBalance = pTotal > (p.paidAmount ?? 0) + 0.01;
     return !p.hasPaid || hasUnpaidBalance;
   }).length;
-  const itemsSubtotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const receiptItemsTotal = session.items.filter(i => !i.addedLater).reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const addedItemsTotal = session.items.filter(i => i.addedLater).reduce((s, i) => s + (Number(i.price) || 0), 0);
+  const itemsSubtotal = receiptItemsTotal + addedItemsTotal;
   const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0);
   const isLocked = session.status === "paying" || session.status === "done";
 
@@ -381,7 +400,7 @@ export default function RoomPage() {
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
         <div className="mb-4 inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
-          👤 Playing as <span className="font-bold">{myName}</span>
+          👤 Paying as <span className="font-bold">{myName}</span>
           {actingAs && (
             <span className="bg-yellow-400/20 text-yellow-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
               Acting as {actingAs}
@@ -453,7 +472,7 @@ export default function RoomPage() {
                         : "bg-muted text-zinc-300"
                   )}
                 >
-                  {p.name}
+                  <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name}
                   {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                   {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
                   {/* Owner controls: claim link & remove */}
@@ -488,7 +507,7 @@ export default function RoomPage() {
               {isOwner && !isAddingFriend && (
                 <button
                   onClick={() => {
-                    setNewFriendName(generateAnimalName(session.participants.map(p => p.name)));
+                    setNewFriendName("");
                     setIsAddingFriend(true);
                   }}
                   className="px-3 py-1.5 rounded-xl text-sm font-medium border border-dashed border-zinc-600 text-zinc-400 hover:border-brand hover:text-brand transition-colors"
@@ -547,7 +566,7 @@ export default function RoomPage() {
                         : "bg-muted text-zinc-400 hover:text-white"
                     )}
                   >
-                    {p.name === myName ? `${p.name} (you)` : p.name}
+                    <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
                   </button>
                 ))}
               </div>
@@ -689,7 +708,7 @@ export default function RoomPage() {
                       <button
                         onClick={() => adjustClaimedQuantity(item.id, 1)}
                         className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                        disabled={myClaimedQty >= item.quantity}
+                        disabled={qtyLeft <= 0 || myClaimedQty >= item.quantity}
                       >
                         +
                       </button>
@@ -706,6 +725,19 @@ export default function RoomPage() {
                       </p>
                     )}
                   </div>
+
+                  {/* Delete button for added items */}
+                  {item.addedLater && isOwner && canInteract && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAddedItem(item.id);
+                      }}
+                      className="ml-2 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-zinc-800/80 text-zinc-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    </button>
+                  )}
                 </div>
               );
             }
@@ -833,19 +865,31 @@ export default function RoomPage() {
             {session.participants.map((p) => (
               <div key={p.name} className="flex justify-between items-center">
                 <span className={clsx("text-sm", p.name === myName && "text-brand font-medium")}>
-                  {p.name === myName ? `${p.name} (you)` : p.name}
+                  <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
                 </span>
                 <span className="font-mono text-sm text-white">
                   RM {(totals?.[p.name] ?? 0).toFixed(2)}
                 </span>
               </div>
             ))}
-            {(session.serviceCharge > 0 || session.sst > 0) && (
+            {(session.serviceCharge > 0 || session.sst > 0 || addedItemsTotal > 0) && (
               <div className="border-t border-muted pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-zinc-400 text-xs">
-                  <span>Subtotal</span>
-                  <span className="font-mono">RM {itemsSubtotal.toFixed(2)}</span>
+                  <span>Receipt Items</span>
+                  <span className="font-mono">RM {receiptItemsTotal.toFixed(2)}</span>
                 </div>
+                {addedItemsTotal > 0 && (
+                  <div className="flex justify-between text-brand text-xs">
+                    <span>+ Missing Items</span>
+                    <span className="font-mono">RM {addedItemsTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {(addedItemsTotal > 0 || session.serviceCharge > 0 || session.sst > 0) && (
+                  <div className="flex justify-between text-zinc-400 text-xs pt-1 border-t border-muted/30 mt-1">
+                    <span>Subtotal</span>
+                    <span className="font-mono">RM {itemsSubtotal.toFixed(2)}</span>
+                  </div>
+                )}
                 {session.serviceCharge > 0 && (
                   <div className="flex justify-between text-zinc-400 text-xs">
                     <span>Service Charge</span>
@@ -1015,7 +1059,9 @@ export default function RoomPage() {
                                         isFullyPaid ? "bg-brand" : hasUnpaidBalance ? "bg-yellow-400" : "bg-zinc-600"
                                       )}
                                     />
-                                    <span className="text-sm text-white font-medium">{p.name}</span>
+                                    <span className="text-sm text-white font-medium">
+                                      <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name}
+                                    </span>
                                     {isFullyPaid && (
                                       <span className="text-brand text-xs flex items-center gap-1">
                                         ✓ {p.paymentMethod === "cash" ? "Cash" : p.paymentMethod === "tng" ? "TNG" : p.paymentMethod === "other" ? "Other" : "paid"}
