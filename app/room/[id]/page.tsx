@@ -754,9 +754,6 @@ export default function RoomPage() {
 
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-2xl font-bold font-mono">Split Bill</h1>
-          <div className="bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold">
-            {session.splitMode === "even" ? "⚖️ Even Split" : "🎯 By Item"}
-          </div>
         </div>
         <div className="text-zinc-400 text-sm flex items-center justify-between mb-6">
           <span>
@@ -832,6 +829,33 @@ export default function RoomPage() {
           {activeParticipantMenu && (
             <div className="fixed inset-0 z-40" onClick={() => setActiveParticipantMenu(null)} />
           )}
+
+          {/* Splitting Method Row */}
+          <div className="bg-surface border border-zinc-700/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xl">
+                {session.splitMode === "even" ? "⚖️" : "🎯"}
+              </div>
+              <div>
+                <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-0.5">Splitting Method</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-white font-mono text-lg font-bold">
+                    {session.splitMode === "even" ? "Split Equally" : "Choose Items"}
+                  </p>
+                  {session.splitMode === "even" && session.participants.length > 0 && (
+                    <span className="text-brand font-mono text-sm font-bold">
+                      · RM {(grandTotal / session.participants.length).toFixed(2)}/pax
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {isOwner && (
+              <button onClick={() => router.push(`/room/${id}/settings`)} className="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-zinc-700 active:scale-95 transition-all">
+                Change
+              </button>
+            )}
+          </div>
 
           {/* Participants */}
           <div>
@@ -943,17 +967,9 @@ export default function RoomPage() {
 
 
           {/* Items Container with Receipt Theme */}
-          <div className="receipt-bg rounded-[10px] px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
+          <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
             {renderItemsList(myName)}
           </div>
-
-          {/* Split Evenly Label */}
-          {session.splitMode === "even" && session.participants.length > 0 && (
-            <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center">
-              <p className="text-brand text-sm font-medium">⚖️ Total bill is split equally</p>
-              <p className="text-brand font-bold mt-1 text-lg font-mono">RM {(grandTotal / session.participants.length).toFixed(2)} <span className="text-xs font-normal">/ person</span></p>
-            </div>
-          )}
 
           {/* Summary */}
           <div className="bg-surface rounded-2xl p-4 space-y-2">
@@ -1705,7 +1721,7 @@ export default function RoomPage() {
             <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pb-32">
-            <div className="receipt-bg rounded-[10px] px-5 pb-5 pt-3 shadow-2xl relative font-mono max-w-lg mx-auto">
+            <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 shadow-2xl relative font-mono max-w-lg mx-auto">
               {renderItemsList(selectForFriend)}
             </div>
           </div>
