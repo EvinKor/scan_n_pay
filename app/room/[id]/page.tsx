@@ -38,12 +38,17 @@ export default function RoomPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemQty, setNewItemQty] = useState(1);
 
-  // Acting-as proxy (owner can act on behalf of someone)
-  const [actingAs, setActingAs] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectForFriend, setSelectForFriend] = useState<string | null>(null);
+
   // Add friend state
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
   const [friendLinkCopied, setFriendLinkCopied] = useState<string | null>(null);
+
+  // Mutation lock and debounce
+  const updateTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isMutating = useRef(false);
 
   // Per-room identity
   const roomUser = getLocalUserForRoom(id);
@@ -72,6 +77,7 @@ export default function RoomPage() {
 
     // Supabase Realtime Subscription
     const channel = subscribeToSession(id, (updated) => {
+      if (isMutating.current) return;
       setSession(updated);
     });
 
@@ -86,11 +92,22 @@ export default function RoomPage() {
       channel.unsubscribe();
       clearInterval(pollInterval);
     };
-  }, [id]);
+  }, [id, myName, router]);
 
   const isOwner = session?.owner === myName;
-  // When the owner is acting on behalf of someone, effectiveName is that person
-  const effectiveName = (isOwner && actingAs) ? actingAs : myName;
+  const effectiveName = myName;
+
+  function debouncedUpdateSession(patch: Partial<Session>) {
+    if (updateTimeout.current) clearTimeout(updateTimeout.current);
+    isMutating.current = true;
+    updateTimeout.current = setTimeout(async () => {
+      try {
+        await updateSession(id, patch);
+      } finally {
+        setTimeout(() => { isMutating.current = false; }, 1000);
+      }
+    }, 400);
+  }
 
   async function setSplitMode(mode: "even" | "byItem") {
     if (!session || !isOwner) return; // only owner can change
@@ -128,22 +145,22 @@ export default function RoomPage() {
     setSaving(false);
   }
 
-  async function toggleItemAssignment(itemId: string) {
+  async function toggleItemAssignment(itemId: string, targetName: string = effectiveName) {
     if (!session || session.splitMode !== "byItem") return;
     const item = session.items.find(i => i.id === itemId);
     if (!item) return;
-    const targetParticipant = session.participants.find(p => p.name === effectiveName);
+    const targetParticipant = session.participants.find(p => p.name === targetName);
     // If target user has paid, they can only interact with addedLater items
     if (targetParticipant?.hasPaid && !item.addedLater) return;
 
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
-      const alreadyHas = (assignments[effectiveName] || 0) > 0;
+      const alreadyHas = (assignments[targetName] || 0) > 0;
       if (alreadyHas) {
-        delete assignments[effectiveName];
+        delete assignments[targetName];
       } else {
-        assignments[effectiveName] = 1;
+        assignments[targetName] = 1;
       }
       return {
         ...item,
@@ -152,30 +169,30 @@ export default function RoomPage() {
     });
     const updated = { ...session, items };
     setSession(updated);
-    await updateSession(id, { items });
+    debouncedUpdateSession({ items });
   }
 
-  async function adjustClaimedQuantity(itemId: string, delta: number) {
+  async function adjustClaimedQuantity(itemId: string, delta: number, targetName: string = effectiveName) {
     if (!session || session.splitMode !== "byItem") return;
     const item = session.items.find(i => i.id === itemId);
     if (!item) return;
-    const targetParticipant = session.participants.find(p => p.name === effectiveName);
+    const targetParticipant = session.participants.find(p => p.name === targetName);
     // If target user has paid, they can only interact with addedLater items
     if (targetParticipant?.hasPaid && !item.addedLater) return;
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
-      const current = assignments[effectiveName] || 0;
+      const current = assignments[targetName] || 0;
       const next = current + delta;
       const totalClaimedOthers = Object.entries(assignments)
-        .filter(([name]) => name !== effectiveName)
+        .filter(([name]) => name !== targetName)
         .reduce((sum, [, qty]) => sum + qty, 0);
       const maxAvailableForMe = Math.max(0, item.quantity - totalClaimedOthers);
       
       if (next <= 0) {
-        delete assignments[effectiveName];
+        delete assignments[targetName];
       } else {
-        assignments[effectiveName] = Math.min(next, maxAvailableForMe);
+        assignments[targetName] = Math.min(next, maxAvailableForMe);
       }
       return {
         ...item,
@@ -184,7 +201,7 @@ export default function RoomPage() {
     });
     const updated = { ...session, items };
     setSession(updated);
-    await updateSession(id, { items });
+    debouncedUpdateSession({ items });
   }
 
   async function lockAndPay() {
@@ -353,8 +370,7 @@ export default function RoomPage() {
     setSession(s => s ? { ...s, participants: newParticipants } : s);
     setNewFriendName("");
     setIsAddingFriend(false);
-    // Auto-switch to acting as the new friend so the owner can select items
-    setActingAs(trimmed);
+    setSelectForFriend(trimmed);
   }
 
   async function copyClaimLink(participantName: string) {
@@ -395,17 +411,253 @@ export default function RoomPage() {
   const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0);
   const isLocked = session.status === "paying" || session.status === "done";
 
+  function renderItemsList(targetName: string) {
+    const s = session!;
+    const receiptItems = s.items.filter(i => !i.addedLater);
+    const addedItems = s.items.filter(i => i.addedLater);
+
+    function renderItemRow(item: LineItem) {
+      const assignments = getAssignments(item);
+      const isMine = (assignments[targetName] || 0) > 0;
+      const myClaimedQty = assignments[targetName] || 0;
+      const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
+      const totalQty = item.quantity || 1;
+      const totalClaimed = assignees.reduce((sum, n) => sum + assignments[n], 0);
+      const qtyLeft = Math.max(0, totalQty - totalClaimed);
+      const isFullyClaimed = totalClaimed >= totalQty;
+      const effectiveParticipant = s.participants.find(p => p.name === targetName);
+      // Paid users can still interact with addedLater items, but not original items
+      const canInteract = item.addedLater
+        ? (isMine || !isFullyClaimed)
+        : (!effectiveParticipant?.hasPaid && (isMine || !isFullyClaimed));
+      const myShare = getItemShare(item, targetName, s.participants.length, isLocked, s.paidBy);
+
+      return (
+        <div
+          key={item.id}
+          onClick={() => {
+            if (s.splitMode === "byItem" && canInteract) {
+              toggleItemAssignment(item.id, targetName);
+            }
+          }}
+          className={clsx(
+            "flex items-center justify-between py-3 transition-all receipt-dashed",
+            s.splitMode === "byItem" && canInteract ? "cursor-pointer" : "cursor-not-allowed",
+            !canInteract && "opacity-50 grayscale",
+            isMine && s.splitMode === "byItem"
+              ? "bg-brand/10 border-l-4 border-brand pl-3 shadow-[inset_0_0_10px_rgba(0,200,150,0.1)] -ml-4"
+              : "pl-0"
+          )}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {s.splitMode === "byItem" && (
+              <div
+                className={clsx(
+                  "w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all",
+                  isMine ? "bg-brand border-brand" : "border-gray-400"
+                )}
+              >
+                {isMine && <span className="text-black text-xs font-bold">✓</span>}
+              </div>
+            )}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-black text-sm truncate font-bold">{item.name}</span>
+                {(item.quantity ?? 1) > 1 && (
+                  <span className="text-gray-500 text-xs flex-shrink-0 font-bold">×{item.quantity}</span>
+                )}
+                {s.splitMode === "byItem" && totalQty > 1 && (
+                  <span className={clsx(
+                    "px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0",
+                    qtyLeft > 0 ? "bg-brand/20 text-brand" : "bg-gray-200 text-gray-500"
+                  )}>
+                    {qtyLeft} left
+                  </span>
+                )}
+              </div>
+              {s.splitMode === "byItem" && assignees.length > 0 && (
+                <div className="text-gray-500 text-xs mt-1 truncate">
+                  {assignees.map((name) => {
+                    const qty = assignments[name];
+                    return `${name}${item.quantity > 1 ? ` (${qty})` : ""}`;
+                  }).join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quantity Adjuster for Claimed Items */}
+          {s.splitMode === "byItem" && isMine && item.quantity > 1 && canInteract && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1 mx-2 flex-shrink-0"
+            >
+              <button
+                onClick={() => adjustClaimedQuantity(item.id, -1, targetName)}
+                className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+              >
+                -
+              </button>
+              <span className="text-white text-sm font-mono px-1 min-w-[12px] text-center">
+                {myClaimedQty}
+              </span>
+              <button
+                onClick={() => adjustClaimedQuantity(item.id, 1, targetName)}
+                className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+                disabled={qtyLeft <= 0 || myClaimedQty >= item.quantity}
+              >
+                +
+              </button>
+            </div>
+          )}
+
+          <div className="text-right flex-shrink-0 ml-2">
+            <span className="text-black font-mono text-sm font-bold">
+              RM {(Number(item.price) || 0).toFixed(2)}
+            </span>
+            {s.splitMode === "byItem" && isMine && (
+              <p className="text-brand text-xs font-mono font-bold">
+                your share: RM {myShare.toFixed(2)}
+              </p>
+            )}
+          </div>
+
+          {/* Delete button for added items */}
+          {item.addedLater && isOwner && canInteract && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteAddedItem(item.id);
+              }}
+              className="ml-2 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-zinc-800/80 text-zinc-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Receipt Items */}
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-bold border-b border-gray-300 pb-1">
+            📋 Receipt Items
+            {s.splitMode === "byItem" && (
+              <span className="ml-2 text-brand normal-case italic">tap to claim yours</span>
+            )}
+          </p>
+          <div className="space-y-2">
+            {receiptItems.map(renderItemRow)}
+          </div>
+        </div>
+
+        {/* Added Later Items */}
+        {addedItems.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-bold border-b border-gray-300 pb-1">
+              ➕ Added Later
+              {myParticipant?.hasPaid && (
+                <span className="ml-2 text-yellow-600 normal-case italic">unpaid add-ons</span>
+              )}
+            </p>
+            <div className="space-y-2">
+              {addedItems.map(renderItemRow)}
+            </div>
+          </div>
+        )}
+
+        {/* Inline Add Missing Item */}
+        {s.splitMode === "byItem" && (
+          <div>
+            {isAddingItem ? (
+              <div className="bg-surface rounded-xl p-3 border border-brand/30 space-y-3">
+                <p className="text-xs text-brand font-medium">Add missing item</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Item name"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
+                    autoFocus
+                  />
+                  <div className="relative w-24">
+                    <span className="absolute left-3 top-2 text-zinc-500 text-sm">RM</span>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      step="0.10"
+                      min="0"
+                      value={newItemPrice}
+                      onChange={(e) => setNewItemPrice(e.target.value)}
+                      className="w-full bg-zinc-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
+                    />
+                  </div>
+                </div>
+                {/* Quantity selector */}
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-400 text-xs">Qty:</span>
+                  <div className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1">
+                    <button
+                      onClick={() => setNewItemQty(Math.max(1, newItemQty - 1))}
+                      className="w-7 h-7 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+                    >
+                      -
+                    </button>
+                    <span className="text-white text-sm font-mono px-2 min-w-[20px] text-center">
+                      {newItemQty}
+                    </span>
+                    <button
+                      onClick={() => setNewItemQty(newItemQty + 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddMissingItem}
+                    disabled={!newItemName.trim() || !newItemPrice || saving}
+                    className="flex-1 bg-brand text-black font-semibold text-sm py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-all"
+                  >
+                    Add & Claim
+                  </button>
+                  <button
+                    onClick={() => { setIsAddingItem(false); setNewItemName(""); setNewItemPrice(""); setNewItemQty(1); }}
+                    className="px-4 bg-zinc-800 text-zinc-300 font-semibold text-sm py-2 rounded-lg hover:bg-zinc-700 transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAddingItem(true)}
+                className="w-full border border-dashed border-gray-400 rounded-xl py-3 text-gray-500 font-bold text-sm hover:border-brand hover:text-brand transition-colors flex items-center justify-center gap-2 mt-4"
+              >
+                <span>+</span> Add missing item
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
-        <div className="mb-4 inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
-          👤 Paying as <span className="font-bold">{myName}</span>
-          {actingAs && (
-            <span className="bg-yellow-400/20 text-yellow-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
-              Acting as {actingAs}
-            </span>
-          )}
+        <div className="flex items-center gap-2 mb-4">
+          <button onClick={() => router.push("/")} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors">
+            ←
+          </button>
+          <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
+            👤 Paying as <span className="font-bold">{myName}</span>
+          </div>
         </div>
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-xl font-bold font-mono">{session.code}</h1>
@@ -413,6 +665,14 @@ export default function RoomPage() {
             <span className="text-xs bg-muted text-zinc-400 px-3 py-1 rounded-full">
               {session.participants.length} people
             </span>
+            {isOwner && (
+              <button
+                onClick={() => setShowSettings(true)}
+                className="bg-muted text-zinc-300 w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-700 active:scale-95 transition-all"
+              >
+                ⚙️
+              </button>
+            )}
             <button
               onClick={handleShare}
               className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
@@ -475,30 +735,31 @@ export default function RoomPage() {
                   <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name}
                   {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                   {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
-                  {/* Owner controls: claim link & remove */}
+                  {/* Owner controls: claim link & select items */}
                   {isOwner && p.name !== myName && (
-                    <>
+                    <div className="flex items-center gap-1 ml-1 pl-1 border-l border-zinc-700/50">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           copyClaimLink(p.name);
                         }}
-                        className="ml-1 text-[10px] text-zinc-500 hover:text-brand transition-colors"
+                        className="text-[10px] text-zinc-500 hover:text-brand transition-colors p-1"
                         title="Copy claim link for this person"
                       >
                         {friendLinkCopied === p.name ? "✅" : "🔗"}
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveParticipant(p.name);
-                        }}
-                        className="w-4 h-4 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
-                        title="Remove participant"
-                      >
-                        <span className="text-[10px] leading-none mb-0.5">✕</span>
-                      </button>
-                    </>
+                      {session.splitMode === "byItem" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectForFriend(p.name);
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand/20 text-brand hover:bg-brand/30 transition-colors whitespace-nowrap"
+                        >
+                          Select items
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -550,306 +811,12 @@ export default function RoomPage() {
             )}
           </div>
 
-          {/* Acting As selector (owner only, byItem mode) */}
-          {isOwner && session.splitMode === "byItem" && session.participants.length > 1 && (
-            <div className="bg-surface border border-zinc-700/50 rounded-xl p-3">
-              <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-2 font-semibold">Selecting items as</p>
-              <div className="flex flex-wrap gap-2">
-                {session.participants.map((p) => (
-                  <button
-                    key={p.name}
-                    onClick={() => setActingAs(p.name === myName ? null : p.name)}
-                    className={clsx(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                      effectiveName === p.name
-                        ? "bg-brand text-black"
-                        : "bg-muted text-zinc-400 hover:text-white"
-                    )}
-                  >
-                    <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
-                  </button>
-                ))}
-              </div>
-              {actingAs && (
-                <p className="text-yellow-400 text-xs mt-2 flex items-center gap-1">
-                  ⚠️ Tapping items will assign them to <span className="font-bold">{actingAs}</span>
-                </p>
-              )}
-            </div>
-          )}
 
-          {/* Split mode — owner only */}
-          <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Split method</p>
-            {isOwner ? (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setSplitMode("even")}
-                  className={clsx(
-                    "rounded-xl py-3 text-sm font-medium transition-all",
-                    session.splitMode === "even"
-                      ? "bg-brand text-black"
-                      : "bg-muted text-zinc-300 hover:bg-zinc-700"
-                  )}
-                >
-                  ⚖️ Split evenly
-                </button>
-                <button
-                  onClick={() => setSplitMode("byItem")}
-                  className={clsx(
-                    "rounded-xl py-3 text-sm font-medium transition-all",
-                    session.splitMode === "byItem"
-                      ? "bg-brand text-black"
-                      : "bg-muted text-zinc-300 hover:bg-zinc-700"
-                  )}
-                >
-                  🎯 Choose items
-                </button>
-              </div>
-            ) : (
-              <div className="bg-surface rounded-xl px-4 py-3 text-sm text-zinc-300">
-                {session.splitMode === "even" ? "⚖️ Split evenly" : "🎯 Choose items"}
-                <span className="text-zinc-600 text-xs ml-2">· Set by host</span>
-              </div>
-            )}
+
+          {/* Items Container with Receipt Theme */}
+          <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
+            {renderItemsList(myName)}
           </div>
-
-          {/* Items */}
-          {(() => {
-            const s = session!;
-            const receiptItems = s.items.filter(i => !i.addedLater);
-            const addedItems = s.items.filter(i => i.addedLater);
-
-            function renderItemRow(item: LineItem) {
-              const assignments = getAssignments(item);
-              const isMine = (assignments[effectiveName] || 0) > 0;
-              const myClaimedQty = assignments[effectiveName] || 0;
-              const assignees = Object.keys(assignments).filter((n) => assignments[n] > 0);
-              const totalQty = item.quantity || 1;
-              const totalClaimed = assignees.reduce((sum, n) => sum + assignments[n], 0);
-              const qtyLeft = Math.max(0, totalQty - totalClaimed);
-              const isFullyClaimed = totalClaimed >= totalQty;
-              const effectiveParticipant = s.participants.find(p => p.name === effectiveName);
-              // Paid users can still interact with addedLater items, but not original items
-              const canInteract = item.addedLater
-                ? (isMine || !isFullyClaimed)
-                : (!effectiveParticipant?.hasPaid && (isMine || !isFullyClaimed));
-              const myShare = getItemShare(item, effectiveName, s.participants.length, isLocked, s.paidBy);
-
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    if (s.splitMode === "byItem" && canInteract) {
-                      toggleItemAssignment(item.id);
-                    }
-                  }}
-                  className={clsx(
-                    "flex items-center justify-between rounded-xl px-4 py-3 transition-all",
-                    s.splitMode === "byItem" && canInteract ? "cursor-pointer" : "cursor-not-allowed",
-                    !canInteract && "opacity-50 grayscale",
-                    isMine && s.splitMode === "byItem"
-                      ? "bg-brand/10 border border-brand/30"
-                      : "bg-surface"
-                  )}
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {s.splitMode === "byItem" && (
-                      <div
-                        className={clsx(
-                          "w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all",
-                          isMine ? "bg-brand border-brand" : "border-zinc-600"
-                        )}
-                      >
-                        {isMine && <span className="text-black text-xs font-bold">✓</span>}
-                      </div>
-                    )}
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white text-sm truncate">{item.name}</span>
-                        {(item.quantity ?? 1) > 1 && (
-                          <span className="text-zinc-500 text-xs flex-shrink-0">×{item.quantity}</span>
-                        )}
-                        {s.splitMode === "byItem" && totalQty > 1 && (
-                          <span className={clsx(
-                            "px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0",
-                            qtyLeft > 0 ? "bg-brand/20 text-brand" : "bg-zinc-700/50 text-zinc-500"
-                          )}>
-                            {qtyLeft} left
-                          </span>
-                        )}
-                      </div>
-                      {s.splitMode === "byItem" && assignees.length > 0 && (
-                        <div className="text-zinc-500 text-xs mt-1 truncate">
-                          {assignees.map((name) => {
-                            const qty = assignments[name];
-                            return `${name}${item.quantity > 1 ? ` (${qty})` : ""}`;
-                          }).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quantity Adjuster for Claimed Items */}
-                  {s.splitMode === "byItem" && isMine && item.quantity > 1 && canInteract && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1 mx-2 flex-shrink-0"
-                    >
-                      <button
-                        onClick={() => adjustClaimedQuantity(item.id, -1)}
-                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                      >
-                        -
-                      </button>
-                      <span className="text-white text-sm font-mono px-1 min-w-[12px] text-center">
-                        {myClaimedQty}
-                      </span>
-                      <button
-                        onClick={() => adjustClaimedQuantity(item.id, 1)}
-                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                        disabled={qtyLeft <= 0 || myClaimedQty >= item.quantity}
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <span className="text-white font-mono text-sm">
-                      RM {(Number(item.price) || 0).toFixed(2)}
-                    </span>
-                    {s.splitMode === "byItem" && isMine && (
-                      <p className="text-brand text-xs font-mono">
-                        your share: RM {myShare.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Delete button for added items */}
-                  {item.addedLater && isOwner && canInteract && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteAddedItem(item.id);
-                      }}
-                      className="ml-2 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-zinc-800/80 text-zinc-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                    </button>
-                  )}
-                </div>
-              );
-            }
-
-            return (
-              <div className="space-y-4">
-                {/* Receipt Items */}
-                <div>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">
-                    📋 Receipt Items
-                    {s.splitMode === "byItem" && (
-                      <span className="ml-2 text-brand normal-case">tap to claim yours</span>
-                    )}
-                  </p>
-                  <div className="space-y-2">
-                    {receiptItems.map(renderItemRow)}
-                  </div>
-                </div>
-
-                {/* Added Later Items */}
-                {addedItems.length > 0 && (
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">
-                      ➕ Added Later
-                      {myParticipant?.hasPaid && (
-                        <span className="ml-2 text-yellow-400 normal-case">unpaid add-ons</span>
-                      )}
-                    </p>
-                    <div className="space-y-2">
-                      {addedItems.map(renderItemRow)}
-                    </div>
-                  </div>
-                )}
-
-                {/* Inline Add Missing Item */}
-                {s.splitMode === "byItem" && (
-                  <div>
-                    {isAddingItem ? (
-                      <div className="bg-surface rounded-xl p-3 border border-brand/30 space-y-3">
-                        <p className="text-xs text-brand font-medium">Add missing item</p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Item name"
-                            value={newItemName}
-                            onChange={(e) => setNewItemName(e.target.value)}
-                            className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
-                            autoFocus
-                          />
-                          <div className="relative w-24">
-                            <span className="absolute left-3 top-2 text-zinc-500 text-sm">RM</span>
-                            <input
-                              type="number"
-                              placeholder="0.00"
-                              step="0.10"
-                              min="0"
-                              value={newItemPrice}
-                              onChange={(e) => setNewItemPrice(e.target.value)}
-                              className="w-full bg-zinc-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-500"
-                            />
-                          </div>
-                        </div>
-                        {/* Quantity selector */}
-                        <div className="flex items-center gap-3">
-                          <span className="text-zinc-400 text-xs">Qty:</span>
-                          <div className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1">
-                            <button
-                              onClick={() => setNewItemQty(Math.max(1, newItemQty - 1))}
-                              className="w-7 h-7 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                            >
-                              -
-                            </button>
-                            <span className="text-white text-sm font-mono px-2 min-w-[20px] text-center">
-                              {newItemQty}
-                            </span>
-                            <button
-                              onClick={() => setNewItemQty(newItemQty + 1)}
-                              className="w-7 h-7 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleAddMissingItem}
-                            disabled={!newItemName.trim() || !newItemPrice || saving}
-                            className="flex-1 bg-brand text-black font-semibold text-sm py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-all"
-                          >
-                            Add & Claim
-                          </button>
-                          <button
-                            onClick={() => { setIsAddingItem(false); setNewItemName(""); setNewItemPrice(""); setNewItemQty(1); }}
-                            className="px-4 bg-zinc-800 text-zinc-300 font-semibold text-sm py-2 rounded-lg hover:bg-zinc-700 transition-all"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setIsAddingItem(true)}
-                        className="w-full border border-dashed border-zinc-700 rounded-xl py-3 text-zinc-400 text-sm hover:border-brand hover:text-brand transition-colors flex items-center justify-center gap-2"
-                      >
-                        <span>+</span> Add missing item
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
 
           {/* Split Evenly Label */}
           {session.splitMode === "even" && session.participants.length > 0 && (
@@ -861,6 +828,10 @@ export default function RoomPage() {
 
           {/* Summary */}
           <div className="bg-surface rounded-2xl p-4 space-y-2">
+            <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center mb-4">
+              <p className="text-brand text-xs uppercase tracking-widest font-bold">Your Total</p>
+              <p className="text-brand font-bold text-2xl font-mono">RM {myTotal.toFixed(2)}</p>
+            </div>
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Summary</p>
             {session.participants.map((p) => (
               <div key={p.name} className="flex justify-between items-center">
@@ -1467,6 +1438,15 @@ export default function RoomPage() {
                   {/* TNG: Open TNG app button */}
                   {paymentMethod === "tng" && (
                     <div className="space-y-3">
+                      <div className="bg-brand/10 border border-brand/20 p-3 rounded-xl mb-4">
+                        <p className="text-brand font-bold text-sm mb-1">TNG Payment Guidelines</p>
+                        <p className="text-brand text-xs">There are 2 ways to pay via TNG:</p>
+                        <ul className="text-brand text-xs list-disc pl-4 mt-1">
+                          <li>Save the host's payment QR below and scan it in the TNG app.</li>
+                          <li>Copy the host's phone number and transfer directly in the app.</li>
+                        </ul>
+                      </div>
+
                       {session.qrImage && (
                         <div className="bg-surface border border-zinc-700 rounded-2xl p-4 flex flex-col items-center text-center">
                           <img src={session.qrImage} alt="Payment QR" className="w-48 h-48 rounded-xl object-contain mb-3" />
@@ -1612,6 +1592,81 @@ export default function RoomPage() {
                 alt="Payment proof"
                 className="w-full rounded-xl"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Select for Friend Modal */}
+      {selectForFriend && (
+        <div className="fixed inset-0 z-50 bg-[#121214] flex flex-col animate-in slide-in-from-bottom-full duration-300">
+          <div className="p-4 bg-surface border-b border-zinc-700 flex items-center justify-between pt-8 pb-4">
+            <div>
+               <p className="text-zinc-400 text-xs uppercase tracking-widest">Selecting items for</p>
+               <p className="text-white font-bold text-lg flex items-center gap-2"><span className="text-2xl">{getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
+            </div>
+            <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 pb-32">
+             <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 shadow-2xl relative font-mono max-w-lg mx-auto">
+               {renderItemsList(selectForFriend)}
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Room Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => setShowSettings(false)}>
+          <div className="w-full max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-white font-bold text-lg">Room Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition-colors">✕</button>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Split method</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSplitMode("even")}
+                    className={clsx(
+                      "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
+                      session.splitMode === "even" ? "bg-brand text-black shadow-[0_0_15px_rgba(0,200,150,0.2)]" : "bg-muted border border-zinc-700/50 text-zinc-300 hover:bg-zinc-800"
+                    )}
+                  >
+                    ⚖️ Split evenly
+                  </button>
+                  <button
+                    onClick={() => setSplitMode("byItem")}
+                    className={clsx(
+                      "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
+                      session.splitMode === "byItem" ? "bg-brand text-black shadow-[0_0_15px_rgba(0,200,150,0.2)]" : "bg-muted border border-zinc-700/50 text-zinc-300 hover:bg-zinc-800"
+                    )}
+                  >
+                    🎯 Choose items
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Manage Participants</p>
+                <div className="bg-muted border border-zinc-700/50 rounded-xl divide-y divide-zinc-700/50">
+                  {session.participants.map(p => (
+                    <div key={p.name} className="flex items-center justify-between p-3">
+                      <span className="text-white text-sm flex items-center gap-2"><span className="text-xl">{getAnimalIcon(p.name)}</span> {p.name} {p.name === myName && <span className="text-zinc-500 text-xs">(you)</span>}</span>
+                      {p.name !== myName && (
+                        <button
+                          onClick={() => { handleRemoveParticipant(p.name); setShowSettings(false); }}
+                          className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-semibold hover:bg-red-500/20 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>

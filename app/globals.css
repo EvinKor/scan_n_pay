@@ -30,4 +30,51 @@ html, body {
 
 @layer utilities {
   .font-mono { font-family: 'DM Mono', monospace; }
+
+  /* Receipt Theme Background */
+  .receipt-bg {
+    background-color: #fdfdf9; /* off-white paper */
+    color: #1a1a1a;
+  }
+
+  .receipt-edge-top {
+    mask-image: radial-gradient(circle at 10px 0, transparent 10px, black 11px);
+    mask-size: 20px 100%;
+    mask-position: top;
+    mask-repeat: repeat-x;
+    padding-top: 20px;
+  }
+
+  .receipt-edge-bottom {
+    mask-image: radial-gradient(circle at 10px 100%, transparent 10px, black 11px);
+    mask-size: 20px 100%;
+    mask-position: bottom;
+    mask-repeat: repeat-x;
+    padding-bottom: 20px;
+  }
+  
+  .receipt-dashed {
+    border-bottom: 2px dashed #d1d1d1;
+  }
+}
+
+/* Scanning Animations */
+@keyframes scan-beam {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.animate-scan-beam {
+  animation: scan-beam 2s linear infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(0, 200, 150, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(0, 200, 150, 0.6); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

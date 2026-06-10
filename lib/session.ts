@@ -46,7 +46,7 @@ function generateCode(): string {
   return `${word}-${suffix}`;
 }
 
-export async function createSession(creatorName: string, qrImage?: string): Promise<Session> {
+export async function createSession(creatorName: string, splitMode: "even" | "byItem" = "even", qrImage?: string): Promise<Session> {
   const code = generateCode();
   const session: Omit<Session, "id" | "createdAt"> = {
     code,
@@ -56,7 +56,7 @@ export async function createSession(creatorName: string, qrImage?: string): Prom
     qrImage,
     participants: [{ name: creatorName, hasPaid: false }],
     items: [],
-    splitMode: "even",
+    splitMode,
     status: "scanning",
     totals: {},
     serviceCharge: 0,

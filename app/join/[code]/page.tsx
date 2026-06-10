@@ -94,7 +94,11 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative">
+      <button onClick={() => router.push("/")} className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors z-50">
+        ←
+      </button>
+      
       {/* Logo */}
       <div className="mb-10 text-center">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand mb-4">

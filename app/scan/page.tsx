@@ -142,7 +142,12 @@ export default function ScanPage() {
 
   return (
     <main className="min-h-screen pb-32 px-4 pt-8 max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold font-mono mb-1">Scan Receipt</h1>
+      <div className="flex items-center gap-3 mb-1">
+        <button onClick={() => router.push("/")} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors">
+          ←
+        </button>
+        <h1 className="text-2xl font-bold font-mono">Scan Receipt</h1>
+      </div>
       <p className="text-zinc-400 text-sm mb-6">
         Room: <span className="text-brand font-mono">{session?.code}</span>
       </p>
@@ -160,18 +165,34 @@ export default function ScanPage() {
           Tip: place receipt flat, fill the frame, avoid hands or busy backgrounds.
         </div>
         {preview ? (
-          <div className="flex flex-col items-center">
-            <img src={preview} alt="Receipt" className="max-h-48 rounded-xl object-contain mb-3" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                fileRef.current?.click();
-              }}
-              className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-            >
-              🔄 Rescan / Upload New
-            </button>
+          <div className="flex flex-col items-center w-full relative overflow-hidden rounded-xl">
+            <img src={preview} alt="Receipt" className="max-h-64 rounded-xl object-contain mb-3 relative z-0" />
+            {scanning && (
+              <>
+                <div className="absolute inset-0 z-10 bg-black/20" />
+                <div className="absolute left-0 w-full h-[2px] bg-brand animate-scan-beam z-20 shadow-[0_0_15px_rgba(0,200,150,0.8)]" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
+                  <div className="bg-black/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-brand/30 flex flex-col items-center animate-pulse-glow">
+                    <span className="text-brand font-mono font-bold text-sm mb-1">
+                      {progress < 30 ? "Analyzing layout..." : progress < 70 ? "Extracting text..." : "Parsing items..."}
+                    </span>
+                    <span className="text-white text-xs">{progress}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+            {!scanning && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileRef.current?.click();
+                }}
+                className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 mt-2"
+              >
+                🔄 Rescan / Upload New
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -190,22 +211,6 @@ export default function ScanPage() {
           className="hidden"
         />
       </div>
-
-      {/* OCR Progress */}
-      {scanning && (
-        <div className="mb-6">
-          <div className="flex justify-between text-xs text-zinc-400 mb-1">
-            <span>Reading receipt…</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-brand rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Items List */}
       {items.length > 0 && (
