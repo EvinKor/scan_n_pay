@@ -13,6 +13,7 @@ export default function RoomSettingsPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [showSplitPopup, setShowSplitPopup] = useState(false);
+  const [localGroupName, setLocalGroupName] = useState("");
 
   // Per-room identity
   const roomUser = getLocalUserForRoom(id);
@@ -27,12 +28,17 @@ export default function RoomSettingsPage() {
 
     getSession(id).then((s) => {
       if (!s) { router.push("/"); return; }
-      if (s.owner !== myName) { router.push(`/room/${id}`); return; } // Only owner can see settings
       setSession(s);
+      setLocalGroupName(s.name || s.code);
     });
 
     const channel = subscribeToSession(id, (updated) => {
       setSession(updated);
+      setLocalGroupName((prev) => {
+        // Only update from server if we are not actively editing and it changed
+        if (updated.name && prev !== updated.name) return updated.name;
+        return prev;
+      });
     });
 
     return () => {
@@ -83,7 +89,42 @@ export default function RoomSettingsPage() {
       </div>
 
       <div className="px-4 space-y-6">
-        {/* Split method section */}
+        {/* Group Name - Available to everyone */}
+        <div className="bg-surface p-4 rounded-xl">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Group Name</p>
+            <p className="text-xs text-zinc-600 font-mono">{localGroupName.length}/30</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={localGroupName}
+              onChange={(e) => setLocalGroupName(e.target.value)}
+              className="flex-1 w-full bg-muted border border-zinc-700/50 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors text-sm font-medium"
+              placeholder="Enter group name"
+              maxLength={30}
+            />
+            <button
+              onClick={() => {
+                const finalName = localGroupName.trim() || session.code;
+                setLocalGroupName(finalName);
+                if (finalName !== session.name) {
+                  updateSession(id, { name: finalName });
+                  setSession({ ...session, name: finalName });
+                }
+              }}
+              disabled={localGroupName.trim() === session.name || (localGroupName.trim() === "" && session.code === session.name)}
+              className="bg-brand text-black font-bold px-5 rounded-xl disabled:opacity-50 disabled:bg-zinc-700 disabled:text-zinc-500 hover:bg-opacity-90 transition-colors text-sm"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+
+        {/* Owner-only settings */}
+        {(session.owner === myName) && (
+          <>
+            {/* Split method section */}
         <div className="bg-surface p-4 rounded-xl">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Split method</p>
@@ -134,6 +175,8 @@ export default function RoomSettingsPage() {
             Delete Room
           </button>
         </div>
+          </>
+        )}
       </div>
 
       {/* Split Method Popup */}

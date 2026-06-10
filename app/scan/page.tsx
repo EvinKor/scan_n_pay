@@ -93,6 +93,11 @@ export default function ScanPage() {
     if (items.length === 0) return setError("Add at least one item");
 
     const computedTotal = items.reduce((s, i) => s + (Number(i.price) || 0), 0) + (serviceCharge || 0) + (sst || 0);
+    
+    if (computedTotal <= 0) {
+      return setError("Total cannot be 0");
+    }
+
     if (receiptTotal > 0 && Math.abs(computedTotal - receiptTotal) > 0.05) {
       const proceed = confirm(`The items total (RM ${computedTotal.toFixed(2)}) doesn't match the receipt total (RM ${receiptTotal.toFixed(2)}). Do you want to continue anyway?`);
       if (!proceed) return;

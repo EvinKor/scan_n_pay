@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSession, joinSession } from "@/lib/session";
-import { setLocalUser, setLocalUserForRoom, getLocalUser } from "@/lib/identity";
+import { setLocalUser, setLocalUserForRoom, getLocalUser, getLocalHistory } from "@/lib/identity";
 import { supabase } from "@/lib/supabase";
 import { getAnimalIcon } from "@/lib/animals";
+import clsx from "clsx";
 
 export default function Home() {
   const router = useRouter();
@@ -33,6 +34,12 @@ export default function Home() {
     if (local && local.sessionId) {
       setRecentRoom(local.sessionId);
     }
+    if (local && local.name) {
+      setName(local.name);
+    }
+    
+    // Initial history load (using local name if available)
+    loadAllHistory(local?.name || "");
 
     return () => subscription.unsubscribe();
   }, []);
@@ -42,19 +49,42 @@ export default function Home() {
     if (data?.display_name) {
       setName(data.display_name);
       setIcon(data.icon || "");
-      fetchHistory(data.display_name);
+      loadAllHistory(data.display_name);
     }
   }
 
-  async function fetchHistory(displayName: string) {
-    const { data } = await supabase
-      .from("sessions")
-      .select("id, code, created_at, participants, items, totals")
-      .contains("participants", `[{"name": "${displayName}"}]`)
-      .order("created_at", { ascending: false })
-      .limit(5);
-    
-    if (data) setHistory(data);
+  async function loadAllHistory(displayName: string) {
+    const localRoomIds = getLocalHistory();
+    let dbData: any[] = [];
+    let localData: any[] = [];
+
+    if (displayName) {
+      const { data } = await supabase
+        .from("sessions")
+        .select("id, code, created_at, data")
+        .contains("data->participants", `[{"name": "${displayName}"}]`)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (data) dbData = data;
+    }
+
+    if (localRoomIds.length > 0) {
+      const { data } = await supabase
+        .from("sessions")
+        .select("id, code, created_at, data")
+        .in("id", localRoomIds);
+      if (data) localData = data;
+    }
+
+    // Merge by unique ID
+    const merged = [...dbData];
+    localData.forEach(ld => {
+      if (!merged.find(m => m.id === ld.id)) merged.push(ld);
+    });
+
+    // Sort descending by created_at
+    merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setHistory(merged);
   }
 
   async function handleSignOut() {
@@ -158,40 +188,66 @@ export default function Home() {
             </div>
             
             {/* Session History */}
-            {history.length > 0 && user && (
+            {history.length > 0 && (
               <div className="mt-6 pt-4 border-t border-zinc-800">
-                <h3 className="text-zinc-400 text-xs uppercase tracking-widest font-bold mb-3">Recent Bills</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Recent Bills</h3>
+                  {history.length > 3 && (
+                    <button
+                      onClick={() => router.push("/history")}
+                      className="text-brand text-xs font-bold hover:underline"
+                    >
+                      View Full History →
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
-                  {history.map(h => {
-                    const myTotal = h.totals?.[name] ?? 0;
+                  {history.slice(0, 3).map(h => {
+                    const myTotal = h.data?.totals?.[name] ?? 0;
+                    const grandTotal = (h.data?.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0), 0) || 0) + (h.data?.serviceCharge || 0) + (h.data?.sst || 0);
+                    const participantsList = Array.isArray(h.data?.participants) 
+                      ? h.data.participants.map((p: any) => p.name).join(", ") 
+                      : "";
+
                     return (
                       <button
                         key={h.id}
                         onClick={() => router.push(`/room/${h.id}`)}
-                        className="w-full bg-surface border border-zinc-700 rounded-xl p-3 flex items-center justify-between hover:bg-zinc-800 transition-colors text-left"
+                        className={clsx(
+                          "relative overflow-hidden w-full rounded-xl p-3 flex flex-col transition-colors text-left border",
+                          h.data?.status === "done" 
+                            ? "bg-[#015ABF]/10 border-[#015ABF]/30 hover:bg-[#015ABF]/20" 
+                            : "bg-surface border-zinc-700 hover:bg-zinc-800"
+                        )}
                       >
-                        <div>
-                          <p className="text-white font-mono font-bold text-sm">{h.code}</p>
-                          <p className="text-zinc-500 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
+                        {h.data?.status === "done" && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                            <div className="border-2 border-red-500/80 text-red-500/80 text-xl uppercase tracking-widest font-black px-4 py-1 rotate-[-12deg] rounded-md shadow-sm opacity-90">
+                              SETTLED
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-start justify-between w-full mb-2">
+                          <div className="relative z-20">
+                            <p className="text-white font-mono font-bold text-sm">{h.data?.name || h.code}</p>
+                            <p className="text-zinc-500 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white font-mono font-bold text-sm leading-none mt-1">RM {grandTotal.toFixed(2)}</p>
+                            <p className="text-zinc-500 text-[9px] uppercase mt-0.5">Total Bill</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-brand font-mono font-bold text-sm">RM {myTotal.toFixed(2)}</p>
-                          <p className="text-zinc-500 text-[10px] uppercase">Your share</p>
+                        <div className="bg-[#121214] rounded-lg p-2 border border-zinc-800/50 w-full mt-2">
+                          <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-bold mb-0.5">Owner: {h.data?.owner || "Unknown"}</p>
+                          <p className="text-zinc-300 text-xs line-clamp-1">
+                            👥 {participantsList || "Unknown"}
+                          </p>
                         </div>
                       </button>
                     )
                   })}
                 </div>
               </div>
-            )}
-            
-            {recentRoom && history.length === 0 && (
-              <button
-                onClick={() => router.push(`/room/${recentRoom}`)}
-                className="w-full mt-4 bg-brand/10 text-brand text-sm font-semibold rounded-xl py-3 hover:bg-brand/20 transition-all border border-brand/20"
-              >
-                ↩ Resume Recent Room
-              </button>
             )}
           </>
         )}

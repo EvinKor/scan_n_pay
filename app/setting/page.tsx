@@ -15,7 +15,7 @@ export default function SettingPage() {
   const [icon, setIcon] = useState("");
   const [phone, setPhone] = useState("");
   const [tngQr, setTngQr] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -211,6 +211,23 @@ export default function SettingPage() {
                 className="w-full bg-brand text-black font-bold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50 mt-4"
               >
                 {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </section>
+
+          {/* History */}
+          <section className="space-y-3">
+            <h2 className="text-zinc-500 text-xs uppercase tracking-wide px-2">History</h2>
+            <div className="bg-surface border border-zinc-700 rounded-2xl p-2">
+              <button
+                onClick={() => router.push("/history")}
+                className="w-full bg-transparent hover:bg-zinc-800 text-white font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🧾</span>
+                  <span>View Past Receipts</span>
+                </div>
+                <span className="text-zinc-500">→</span>
               </button>
             </div>
           </section>

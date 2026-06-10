@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 export default function CreatePage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [qrImage, setQrImage] = useState<string>("");
@@ -82,7 +83,7 @@ export default function CreatePage() {
     setSplitMode(selectedMode);
     try {
       const local = getLocalUser();
-      const session = await createSession(name.trim(), selectedMode, qrImage || undefined, local?.icon, phone.trim());
+      const session = await createSession(name.trim(), selectedMode, qrImage || undefined, local?.icon, phone.trim(), groupName.trim());
       setLocalUser({ name: name.trim(), sessionId: session.id, icon: local?.icon, phone: phone.trim() });
       setLocalUserForRoom(session.id, name.trim(), local?.icon);
       router.push(`/scan?session=${session.id}`);
@@ -124,6 +125,16 @@ export default function CreatePage() {
             </div>
 
             <div>
+              <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">Group Name (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Mamak Gang"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors mb-4"
+                maxLength={30}
+              />
+
               <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">Phone Number / DuitNow ID</label>
               <input
                 type="text"

@@ -12,7 +12,7 @@ import {
   getAssignments,
   getItemShare,
 } from "@/lib/session";
-import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom } from "@/lib/identity";
+import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom, addRoomToLocalHistory } from "@/lib/identity";
 import { getAnimalIcon } from "@/lib/animals";
 import clsx from "clsx";
 import { QRCodeSVG } from "qrcode.react";
@@ -75,6 +75,7 @@ export default function RoomPage() {
       if (!s) { router.push("/"); return; }
       if (s.status === "scanning") router.push(`/scan?session=${id}`);
       setSession(s);
+      addRoomToLocalHistory(id);
     });
 
     // Supabase Realtime Subscription
@@ -520,9 +521,9 @@ export default function RoomPage() {
       const isFullyClaimed = totalClaimed >= totalQty;
       const effectiveParticipant = s.participants.find(p => p.name === targetName);
       // Paid users can still interact with addedLater items, but not original items
-      const canInteract = item.addedLater
+      const canInteract = s.status !== "done" && (item.addedLater
         ? (isMine || !isFullyClaimed)
-        : (!effectiveParticipant?.hasPaid && (isMine || !isFullyClaimed));
+        : (!effectiveParticipant?.hasPaid && (isMine || !isFullyClaimed)));
       const myShare = getItemShare(item, targetName, s.participants.length, isLocked, s.paidBy);
 
       return (
@@ -720,15 +721,22 @@ export default function RoomPage() {
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center mb-4">
+          <button 
+            onClick={() => router.push("/")}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors mr-3 flex-shrink-0"
+          >
+            ←
+          </button>
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
             👤 Paying as <span className="font-bold">{myName}</span>
           </div>
+          <div className="flex-1" />
           <div className="flex gap-2">
             <span className="text-xs bg-muted text-zinc-400 px-3 py-1.5 rounded-full flex items-center">
               👥 {session.participants.length}
             </span>
-            {isOwner && (
+            {session.status !== "done" && (
               <button
                 onClick={() => router.push(`/room/${id}/settings`)}
                 className="bg-muted text-zinc-300 w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-700 active:scale-95 transition-all"
@@ -740,7 +748,7 @@ export default function RoomPage() {
         </div>
 
         <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl font-bold font-mono">Split Bill</h1>
+          <h1 className="text-2xl font-bold font-mono">{session.name || session.code}</h1>
         </div>
         <div className="text-zinc-400 text-sm flex items-center justify-between mb-6">
           <span>
@@ -837,7 +845,7 @@ export default function RoomPage() {
                 </div>
               </div>
             </div>
-            {isOwner && (
+            {isOwner && session.status !== "done" && (
               <button onClick={() => router.push(`/room/${id}/settings`)} className="bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-zinc-700 active:scale-95 transition-all">
                 Change
               </button>
@@ -852,7 +860,7 @@ export default function RoomPage() {
                 <div key={p.name} className="relative">
                   <button
                     onClick={() => {
-                      if (isOwner && p.name !== myName) {
+                      if (isOwner && session.status !== "done" && p.name !== myName) {
                         setActiveParticipantMenu(activeParticipantMenu === p.name ? null : p.name);
                       }
                     }}
@@ -863,13 +871,13 @@ export default function RoomPage() {
                         : p.name === myName
                           ? "bg-muted text-white border border-zinc-600"
                           : "bg-muted text-zinc-300",
-                      isOwner && p.name !== myName ? "hover:ring-2 hover:ring-brand/50 cursor-pointer" : "cursor-default"
+                      isOwner && session.status !== "done" && p.name !== myName ? "hover:ring-2 hover:ring-brand/50 cursor-pointer" : "cursor-default"
                     )}
                   >
                     <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
                     {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                     {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
-                    {isOwner && p.name !== myName && (
+                    {isOwner && session.status !== "done" && p.name !== myName && (
                       <span className="ml-1 text-zinc-500 text-[10px]">▼</span>
                     )}
                   </button>
@@ -905,7 +913,7 @@ export default function RoomPage() {
               ))}
 
               {/* Add Friend button (owner only) */}
-              {isOwner && !isAddingFriend && (
+              {isOwner && session.status !== "done" && !isAddingFriend && (
                 <button
                   onClick={() => {
                     setNewFriendName("");
@@ -1179,16 +1187,18 @@ export default function RoomPage() {
                               <span className="font-mono text-sm text-white font-semibold">
                                 RM {(totals?.[p.name] ?? 0).toFixed(2)}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveParticipant(p.name);
-                                }}
-                                className="ml-1 w-5 h-5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
-                                title="Remove participant"
-                              >
-                                <span className="text-[12px] leading-none mb-0.5">✕</span>
-                              </button>
+                              {session.status !== "done" && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveParticipant(p.name);
+                                  }}
+                                  className="ml-1 w-5 h-5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                                  title="Remove participant"
+                                >
+                                  <span className="text-[12px] leading-none mb-0.5">✕</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                           {/* Item breakdown */}
@@ -1318,6 +1328,29 @@ export default function RoomPage() {
               {pendingCount === 0 && session.participants.filter(p => p.name !== session.paidBy).length === 0 && (
                 <div className="bg-surface rounded-2xl p-4 text-center">
                   <p className="text-zinc-500 text-sm">No one else in the room yet. Share the room link to invite others!</p>
+                </div>
+              )}
+
+              {session.status !== "done" ? (
+                <div className="mt-8">
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to settle this receipt? It cannot be changed after settling.")) return;
+                      await updateSession(id, { status: "done" });
+                      setSession(s => s ? { ...s, status: "done" } : s);
+                    }}
+                    className="w-full bg-[#015ABF] text-white font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-xl"
+                  >
+                    Settle Receipt
+                  </button>
+                  <p className="text-zinc-500 text-xs text-center mt-3">
+                    Settling will lock the receipt permanently and mark it as settled in history.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-[#015ABF]/10 border border-[#015ABF]/30 rounded-2xl p-4 text-center mt-6">
+                  <p className="text-[#015ABF] font-bold text-lg">Receipt Settled 🏁</p>
+                  <p className="text-[#015ABF]/80 text-sm mt-1">This receipt is finalized and cannot be modified.</p>
                 </div>
               )}
             </div>
@@ -1660,8 +1693,14 @@ export default function RoomPage() {
       {tab === "split" && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent pointer-events-none">
           <button
-            onClick={() => setTab("pay")}
-            className="pointer-events-auto w-full max-w-lg mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-2xl"
+            onClick={() => {
+              if (grandTotal <= 0) {
+                alert("Total cannot be 0. Please add items with prices.");
+                return;
+              }
+              setTab("pay");
+            }}
+            className="pointer-events-auto w-full max-w-xs mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-2xl"
           >
             Go to Payment →
           </button>

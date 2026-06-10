@@ -75,3 +75,28 @@ export function getLocalUser(): LocalUser | null {
 export function clearLocalUser() {
   localStorage.removeItem(LEGACY_KEY);
 }
+
+// ── Local History for Guests ──
+
+const HISTORY_KEY = "splitlah_history";
+
+export function getLocalHistory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addRoomToLocalHistory(roomId: string) {
+  if (typeof window === "undefined") return;
+  const history = getLocalHistory();
+  // Remove if it already exists to move it to the top
+  const filtered = history.filter(id => id !== roomId);
+  filtered.unshift(roomId);
+  // Keep only the last 10 rooms
+  const limited = filtered.slice(0, 10);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
+}

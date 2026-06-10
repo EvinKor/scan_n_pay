@@ -24,6 +24,7 @@ export interface Participant {
 
 export interface Session {
   id: string;
+  name?: string; // Optional group name
   code: string;
   createdAt: string;
   owner: string; // creator's name — only they can change split mode
@@ -52,10 +53,12 @@ export async function createSession(
   splitMode: "even" | "byItem" = "even", 
   qrImage?: string,
   creatorIcon?: string,
-  phone?: string
+  phone?: string,
+  groupName?: string
 ): Promise<Session> {
   const code = generateCode();
   const session: Omit<Session, "id" | "createdAt"> = {
+    name: groupName || code,
     code,
     owner: creatorName,
     paidBy: "",
@@ -73,7 +76,12 @@ export async function createSession(
 
   const { data, error } = await supabase
     .from("sessions")
-    .insert({ code, data: session })
+    .insert({ 
+      code, 
+      created_by: creatorName,
+      participants_list: session.participants.map(p => p.name),
+      data: session 
+    })
     .select()
     .single();
 
@@ -142,9 +150,14 @@ export async function updateSession(id: string, patch: Partial<Session>) {
 
   const merged = { ...data.data, ...patch };
 
+  const updatePayload: any = { data: merged };
+  if (patch.participants) {
+    updatePayload.participants_list = patch.participants.map(p => p.name);
+  }
+
   const { error } = await supabase
     .from("sessions")
-    .update({ data: merged })
+    .update(updatePayload)
     .eq("id", id);
 
   if (error) throw new Error(error.message);
