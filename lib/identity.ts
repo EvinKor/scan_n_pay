@@ -3,8 +3,10 @@ const ROOM_KEY_PREFIX = "splitlah_room_";
 
 export interface LocalUser {
   name: string;
-  sessionId: string;
+  sessionId?: string; // last joined session
   icon?: string;
+  phone?: string;
+  tng_qr?: string;
 }
 
 // ── Per-Room Identity ──

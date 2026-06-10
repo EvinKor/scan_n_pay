@@ -14,8 +14,8 @@ import {
 } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom } from "@/lib/identity";
 import { getAnimalIcon } from "@/lib/animals";
-
 import clsx from "clsx";
+import { QRCodeSVG } from "qrcode.react";
 
 type Tab = "split" | "pay";
 
@@ -41,10 +41,12 @@ export default function RoomPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [selectForFriend, setSelectForFriend] = useState<string | null>(null);
 
-  // Add friend state
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
   const [friendLinkCopied, setFriendLinkCopied] = useState<string | null>(null);
+
+  // QR Modal State
+  const [showShareQR, setShowShareQR] = useState(false);
 
   // Mutation lock and debounce
   const updateTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -445,8 +447,8 @@ export default function RoomPage() {
             s.splitMode === "byItem" && canInteract ? "cursor-pointer" : "cursor-not-allowed",
             !canInteract && "opacity-50 grayscale",
             isMine && s.splitMode === "byItem"
-              ? "bg-brand/10 border-l-4 border-brand pl-3 shadow-[inset_0_0_10px_rgba(0,200,150,0.1)] -ml-4"
-              : "pl-0"
+              ? "bg-brand/10 border-l-4 border-brand pl-3 pr-4 shadow-[inset_0_0_10px_rgba(0,200,150,0.1)] -mx-4"
+              : "px-0"
           )}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -652,9 +654,6 @@ export default function RoomPage() {
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
         <div className="flex items-center gap-2 mb-4">
-          <button onClick={() => router.push("/")} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors">
-            ←
-          </button>
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
             👤 Paying as <span className="font-bold">{myName}</span>
           </div>
@@ -665,6 +664,18 @@ export default function RoomPage() {
             <span className="text-xs bg-muted text-zinc-400 px-3 py-1 rounded-full">
               {session.participants.length} people
             </span>
+            <button
+              onClick={() => setShowShareQR(true)}
+              className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
+            >
+              📱 QR
+            </button>
+            <button
+              onClick={handleShare}
+              className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
+            >
+              {linkCopied ? "✅ Copied" : "🔗 Share"}
+            </button>
             {isOwner && (
               <button
                 onClick={() => setShowSettings(true)}
@@ -673,12 +684,6 @@ export default function RoomPage() {
                 ⚙️
               </button>
             )}
-            <button
-              onClick={handleShare}
-              className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
-            >
-              {linkCopied ? "✅ Copied" : "🔗 Share"}
-            </button>
           </div>
         </div>
         <p className="text-zinc-400 text-sm flex items-center justify-between mt-1">
@@ -1668,6 +1673,22 @@ export default function RoomPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share QR Modal */}
+      {showShareQR && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowShareQR(false)}>
+          <div className="bg-surface border border-zinc-700 rounded-2xl w-full max-w-sm p-6 space-y-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center">
+              <h2 className="text-white font-bold text-lg">Scan to Join Room</h2>
+              <button onClick={() => setShowShareQR(false)} className="text-zinc-400 hover:text-white">✕</button>
+            </div>
+            <div className="flex justify-center p-4 bg-white rounded-xl">
+              <QRCodeSVG value={`${window.location.origin}/join/${session.code}`} size={200} />
+            </div>
+            <p className="text-center text-zinc-400 text-sm">Have your friends scan this QR code to join the room directly.</p>
           </div>
         </div>
       )}

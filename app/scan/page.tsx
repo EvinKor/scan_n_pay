@@ -143,9 +143,6 @@ export default function ScanPage() {
   return (
     <main className="min-h-screen pb-32 px-4 pt-8 max-w-lg mx-auto">
       <div className="flex items-center gap-3 mb-1">
-        <button onClick={() => router.push("/")} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors">
-          ←
-        </button>
         <h1 className="text-2xl font-bold font-mono">Scan Receipt</h1>
       </div>
       <p className="text-zinc-400 text-sm mb-6">

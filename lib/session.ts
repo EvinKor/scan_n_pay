@@ -51,14 +51,15 @@ export async function createSession(
   creatorName: string, 
   splitMode: "even" | "byItem" = "even", 
   qrImage?: string,
-  creatorIcon?: string
+  creatorIcon?: string,
+  phone?: string
 ): Promise<Session> {
   const code = generateCode();
   const session: Omit<Session, "id" | "createdAt"> = {
     code,
     owner: creatorName,
     paidBy: "",
-    paidByPhone: "",
+    paidByPhone: phone || "",
     qrImage,
     participants: [{ name: creatorName, icon: creatorIcon, hasPaid: false }],
     items: [],

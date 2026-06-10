@@ -24,23 +24,26 @@ export default function InstallPWA() {
     };
   }, []);
 
-  async function handleInstall() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
+  function handleInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === "accepted") {
+          setDeferredPrompt(null);
+        }
+      });
+    } else {
+      // Fallback for iOS or unsupported browsers
+      alert("To install the app:\n\nOn iOS: Tap the Share button (square with arrow pointing up) at the bottom, then scroll down and tap 'Add to Home Screen'.\n\nOn Android/Chrome: Tap the browser menu (3 dots) and select 'Install app' or 'Add to Home screen'.");
     }
   }
 
-  if (isStandalone || !deferredPrompt) return null;
-
-  if (isStandalone || !deferredPrompt) return null;
+  if (isStandalone) return null;
 
   return (
     <button
       onClick={handleInstall}
-      className="w-full bg-brand/10 text-brand font-semibold rounded-xl py-3 border border-brand/20 hover:bg-brand/20 transition-all flex items-center justify-center gap-2 mt-4"
+      className="w-full bg-brand/10 text-brand font-semibold rounded-xl py-3 border border-brand/20 hover:bg-brand/20 transition-all flex items-center justify-center gap-2"
     >
       📱 Add to Home Screen
     </button>

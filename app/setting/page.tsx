@@ -13,6 +13,8 @@ export default function SettingPage() {
   const [user, setUser] = useState<any>(null);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("");
+  const [phone, setPhone] = useState("");
+  const [tngQr, setTngQr] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -26,11 +28,13 @@ export default function SettingPage() {
       setUser(currentUser);
       if (currentUser) {
         // Fetch from Supabase
-        supabase.from("profiles").select("display_name, icon").eq("id", currentUser.id).single()
+        supabase.from("profiles").select("display_name, icon, phone, tng_qr").eq("id", currentUser.id).single()
           .then(({ data }) => {
             if (data) {
               setName(data.display_name || "");
               setIcon(data.icon || "");
+              setPhone(data.phone || "");
+              setTngQr(data.tng_qr || "");
             }
             setLoading(false);
           });
@@ -40,11 +44,38 @@ export default function SettingPage() {
         if (local) {
           setName(local.name || "");
           setIcon(local.icon || "");
+          setPhone(local.phone || "");
+          setTngQr(local.tng_qr || "");
         }
         setLoading(false);
       }
     });
   }, []);
+
+  function handleQRUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX = 800; // compress
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        setTngQr(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -60,14 +91,14 @@ export default function SettingPage() {
         // Save to Supabase
         const { error: dbError } = await supabase
           .from("profiles")
-          .update({ display_name: name.trim(), icon })
+          .update({ display_name: name.trim(), icon, phone: phone.trim(), tng_qr: tngQr })
           .eq("id", user.id);
         if (dbError) throw dbError;
       }
 
       // Always save to local storage as well for fallback
       const local = getLocalUser();
-      setLocalUser({ name: name.trim(), sessionId: local?.sessionId || "", icon });
+      setLocalUser({ name: name.trim(), sessionId: local?.sessionId || "", icon, phone: phone.trim(), tng_qr: tngQr });
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -141,6 +172,34 @@ export default function SettingPage() {
                 <p className="text-zinc-500 text-[10px] mt-2">
                   {!icon ? "🎲 Random animal icon (default)" : `Selected: ${icon}`}
                 </p>
+              </div>
+
+
+
+              <div>
+                <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
+                  Default TNG/DuitNow QR
+                </label>
+                <div className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleQRUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  {tngQr ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <img src={tngQr} alt="QR Code" className="w-16 h-16 rounded-lg object-cover" />
+                      <span className="text-brand text-xs font-semibold">QR Saved! (Tap to change)</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-2xl">📱</span>
+                      <span className="text-zinc-400 text-sm">Upload QR Code</span>
+                      <span className="text-zinc-600 text-xs">Used as default for new bills</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {error && <p className="text-red-400 text-sm">{error}</p>}
