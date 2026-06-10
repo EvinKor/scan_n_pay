@@ -90,7 +90,6 @@ export default function ScanPage() {
   async function handleNext() {
     if (!sessionId) return setError("Unable to continue without a session.");
     if (!paidBy) return setError("Select who paid");
-    if (!paidByPhone.trim()) return setError("Enter payer's TNG phone number");
     if (items.length === 0) return setError("Add at least one item");
 
     const computedTotal = items.reduce((s, i) => s + (Number(i.price) || 0), 0) + (serviceCharge || 0) + (sst || 0);
@@ -102,7 +101,6 @@ export default function ScanPage() {
     await updateSession(sessionId, {
       items,
       paidBy,
-      paidByPhone,
       serviceCharge,
       sst,
       receiptTotal,
@@ -356,13 +354,7 @@ export default function ScanPage() {
             ))}
           </div>
 
-          <input
-            type="tel"
-            placeholder="Payer's TNG phone number (e.g. 0123456789)"
-            value={paidByPhone}
-            onChange={(e) => setPaidByPhone(e.target.value)}
-            className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors font-mono"
-          />
+
         </div>
       )}
 

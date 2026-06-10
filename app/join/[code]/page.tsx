@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getSessionByCode, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
+import clsx from "clsx";
 
 
 export default function JoinPage() {
@@ -18,7 +19,20 @@ export default function JoinPage() {
   const [error, setError] = useState("");
   const [roomExists, setRoomExists] = useState(false);
   const [participantNames, setParticipantNames] = useState<string[]>([]);
+  const [owner, setOwner] = useState("");
   const [claimMode, setClaimMode] = useState(false); // true when using ?as= link
+
+  const RANDOM_NAMES = [
+    "SleepyPanda", "HappyOtter", "CleverFox", "ChillCapybara", "SneakyRaccoon",
+    "FuzzyKoala", "SmartOwl", "BraveLion", "TinyMouse", "JumpingFrog"
+  ];
+
+  // Auto-generate a random name on initial load
+  useEffect(() => {
+    if (!claimAs && !name) {
+      setName(RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)] + Math.floor(Math.random() * 100));
+    }
+  }, []);
 
   // Check if room exists & generate animal name
   useEffect(() => {
@@ -31,7 +45,10 @@ export default function JoinPage() {
           return;
         }
         setRoomExists(true);
-        const existingNames = session.participants.map((p) => p.name);
+        setOwner(session.owner);
+        
+        // Exclude the owner from the selectable list so no one can join as them
+        const existingNames = session.participants.map((p) => p.name).filter(n => n !== session.owner);
         setParticipantNames(existingNames);
 
         // If ?as=Name is provided and that name exists in the room, auto-claim
@@ -50,6 +67,8 @@ export default function JoinPage() {
 
   async function handleJoin() {
     if (!name.trim()) return setError("Enter a name first");
+    if (name.trim() === owner) return setError("You cannot join as the room host.");
+    
     setLoading(true);
     setError("");
     try {
@@ -127,16 +146,45 @@ export default function JoinPage() {
           </p>
         </div>
 
-        {/* Editable name — hide in claim mode since the name is fixed */}
+        {/* Select existing member or enter new name */}
+        {!claimMode && participantNames.length > 0 && (
+          <div className="mb-6">
+            <p className="text-zinc-500 text-xs uppercase tracking-wide mb-3">Join as existing member</p>
+            <div className="flex flex-wrap gap-2">
+              {participantNames.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { setName(p); setError(""); }}
+                  className={clsx(
+                    "px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2",
+                    name === p
+                      ? "bg-brand text-black shadow-[0_0_15px_rgba(0,200,150,0.2)]"
+                      : "bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  )}
+                >
+                  <span className="text-xl">{getAnimalEmoji(p)}</span>
+                  {p}
+                </button>
+              ))}
+            </div>
+            
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-zinc-800"></div>
+              <p className="text-zinc-500 text-xs font-semibold uppercase">OR</p>
+              <div className="flex-1 h-px bg-zinc-800"></div>
+            </div>
+          </div>
+        )}
+
         {!claimMode && (
           <div>
             <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
-              Change your name (optional)
+              {participantNames.length > 0 ? "Join as new member" : "Change your name (optional)"}
             </label>
             <input
               type="text"
-              placeholder="Your display name"
-              value={name}
+              placeholder={participantNames.length > 0 ? "Enter a new name" : "Your display name"}
+              value={participantNames.includes(name) ? "" : name}
               onChange={(e) => { setName(e.target.value); setError(""); }}
               className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
               maxLength={24}

@@ -233,7 +233,7 @@ export function calculateTotals(session: Session, forceLocked: boolean = false):
 
   const itemsSubtotal = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
   const grandTotal = itemsSubtotal + (serviceCharge || 0) + (sst || 0);
-  const isLocked = session.status === "paying" || session.status === "done" || forceLocked;
+  const isLocked = true; // Room is always considered locked for calculations since manual lock phase is removed
 
   if (splitMode === "even") {
     const share = grandTotal / participants.length;
@@ -282,4 +282,9 @@ export function calculateTotals(session: Session, forceLocked: boolean = false):
   }
 
   return totals;
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  const { error } = await supabase.from("sessions").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }

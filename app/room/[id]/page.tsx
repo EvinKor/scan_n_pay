@@ -38,8 +38,8 @@ export default function RoomPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemQty, setNewItemQty] = useState(1);
 
-  const [showSettings, setShowSettings] = useState(false);
   const [selectForFriend, setSelectForFriend] = useState<string | null>(null);
+  const [activeParticipantMenu, setActiveParticipantMenu] = useState<string | null>(null);
 
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
@@ -124,7 +124,7 @@ export default function RoomPage() {
     if (!session || !newItemName.trim() || !newItemPrice) return;
     const price = parseFloat(newItemPrice);
     if (isNaN(price) || price < 0) return;
-    
+
     setSaving(true);
     const newItem: LineItem = {
       id: Math.random().toString(36).substring(2, 9),
@@ -134,12 +134,12 @@ export default function RoomPage() {
       assignedTo: { [effectiveName]: newItemQty },
       addedLater: true,
     };
-    
+
     const items = [...session.items, newItem];
     const updated = { ...session, items };
     setSession(updated);
     await updateSession(id, { items });
-    
+
     setIsAddingItem(false);
     setNewItemName("");
     setNewItemPrice("");
@@ -190,7 +190,7 @@ export default function RoomPage() {
         .filter(([name]) => name !== targetName)
         .reduce((sum, [, qty]) => sum + qty, 0);
       const maxAvailableForMe = Math.max(0, item.quantity - totalClaimedOthers);
-      
+
       if (next <= 0) {
         delete assignments[targetName];
       } else {
@@ -201,6 +201,56 @@ export default function RoomPage() {
         assignedTo: assignments,
       };
     });
+    const updated = { ...session, items };
+    setSession(updated);
+    debouncedUpdateSession({ items });
+  }
+
+  async function claimRest(targetName: string = effectiveName) {
+    if (!session || session.splitMode !== "byItem") return;
+    const targetParticipant = session.participants.find(p => p.name === targetName);
+
+    const items = session.items.map((item) => {
+      // If target user has paid, they can only interact with addedLater items
+      if (targetParticipant?.hasPaid && !item.addedLater) return item;
+
+      const assignments = { ...getAssignments(item) };
+      const totalQty = item.quantity || 1;
+      const totalClaimed = Object.values(assignments).reduce((sum, qty) => sum + Number(qty), 0);
+
+      const qtyLeft = totalQty - totalClaimed;
+      if (qtyLeft > 0) {
+        assignments[targetName] = (assignments[targetName] || 0) + qtyLeft;
+      }
+      return {
+        ...item,
+        assignedTo: assignments,
+      };
+    });
+
+    const updated = { ...session, items };
+    setSession(updated);
+    debouncedUpdateSession({ items });
+  }
+
+  async function deselectAll(targetName: string = effectiveName) {
+    if (!session || session.splitMode !== "byItem") return;
+    const targetParticipant = session.participants.find(p => p.name === targetName);
+
+    const items = session.items.map((item) => {
+      // If target user has paid, they can only interact with addedLater items
+      if (targetParticipant?.hasPaid && !item.addedLater) return item;
+
+      const assignments = { ...getAssignments(item) };
+      if (assignments[targetName] !== undefined) {
+        delete assignments[targetName];
+      }
+      return {
+        ...item,
+        assignedTo: assignments,
+      };
+    });
+
     const updated = { ...session, items };
     setSession(updated);
     debouncedUpdateSession({ items });
@@ -317,7 +367,7 @@ export default function RoomPage() {
     if (session.splitMode === "byItem") {
       newItems = session.items.map(item => {
         if (!item.assignedTo) return item;
-        
+
         if (Array.isArray(item.assignedTo)) {
           const newAssignedTo = item.assignedTo.filter((name: string) => name !== nameToRemove);
           return { ...item, assignedTo: newAssignedTo };
@@ -413,6 +463,32 @@ export default function RoomPage() {
   const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0);
   const isLocked = session.status === "paying" || session.status === "done";
 
+  let unclaimedAmount = 0;
+  if (session.splitMode === "byItem") {
+    let unclaimedSubtotal = 0;
+    const totalSubtotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+
+    session.items.forEach(item => {
+      const price = Number(item.price) || 0;
+      if (price <= 0) return;
+      const assignments = getAssignments(item);
+      const assignedNames = Object.keys(assignments).filter((n) => assignments[n] > 0);
+      if (assignedNames.length === 0) {
+        unclaimedSubtotal += price;
+      } else {
+        const totalClaimed = assignedNames.reduce((sum, n) => sum + assignments[n], 0);
+        if (totalClaimed < (item.quantity || 1)) {
+          unclaimedSubtotal += (price / (item.quantity || 1)) * ((item.quantity || 1) - totalClaimed);
+        }
+      }
+    });
+
+    if (unclaimedSubtotal > 0 && totalSubtotal > 0) {
+      const ratioUnclaimed = unclaimedSubtotal / totalSubtotal;
+      unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed;
+    }
+  }
+
   function renderItemsList(targetName: string) {
     const s = session!;
     const receiptItems = s.items.filter(i => !i.addedLater);
@@ -452,16 +528,6 @@ export default function RoomPage() {
           )}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            {s.splitMode === "byItem" && (
-              <div
-                className={clsx(
-                  "w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all",
-                  isMine ? "bg-brand border-brand" : "border-gray-400"
-                )}
-              >
-                {isMine && <span className="text-black text-xs font-bold">✓</span>}
-              </div>
-            )}
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-black text-sm truncate font-bold">{item.name}</span>
@@ -531,7 +597,7 @@ export default function RoomPage() {
                 e.stopPropagation();
                 handleDeleteAddedItem(item.id);
               }}
-              className="ml-2 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-zinc-800/80 text-zinc-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+              className="ml-2 w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
             </button>
@@ -544,12 +610,26 @@ export default function RoomPage() {
       <div className="space-y-4">
         {/* Receipt Items */}
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-bold border-b border-gray-300 pb-1">
-            📋 Receipt Items
+          <div className="flex justify-between items-end border-b border-gray-300 pb-2 mb-2">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
+                📋 Receipt Items
+              </p>
+              {s.splitMode === "byItem" && (
+                <p className="text-[10px] text-brand italic">tap to claim yours</p>
+              )}
+            </div>
             {s.splitMode === "byItem" && (
-              <span className="ml-2 text-brand normal-case italic">tap to claim yours</span>
+              <div className="flex gap-1">
+                <button onClick={() => deselectAll(targetName)} className="text-zinc-500 hover:text-zinc-300 font-medium text-[11px] px-2 py-1 rounded-md hover:bg-zinc-800/50 active:scale-95 transition-all">
+                  Clear all
+                </button>
+                <button onClick={() => claimRest(targetName)} className="text-zinc-400 hover:text-zinc-200 font-medium text-[11px] px-2 py-1 rounded-md hover:bg-zinc-800/50 active:scale-95 transition-all">
+                  Claim rest
+                </button>
+              </div>
             )}
-          </p>
+          </div>
           <div className="space-y-2">
             {receiptItems.map(renderItemRow)}
           </div>
@@ -653,32 +733,17 @@ export default function RoomPage() {
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center justify-between mb-4">
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
             👤 Paying as <span className="font-bold">{myName}</span>
           </div>
-        </div>
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="text-xl font-bold font-mono">{session.code}</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-muted text-zinc-400 px-3 py-1 rounded-full">
-              {session.participants.length} people
+          <div className="flex gap-2">
+            <span className="text-xs bg-muted text-zinc-400 px-3 py-1.5 rounded-full flex items-center">
+              👥 {session.participants.length}
             </span>
-            <button
-              onClick={() => setShowShareQR(true)}
-              className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
-            >
-              📱 QR
-            </button>
-            <button
-              onClick={handleShare}
-              className="bg-muted text-zinc-300 px-3 py-1 rounded-full text-xs font-medium hover:bg-zinc-700 active:scale-95 transition-all flex items-center gap-1"
-            >
-              {linkCopied ? "✅ Copied" : "🔗 Share"}
-            </button>
             {isOwner && (
               <button
-                onClick={() => setShowSettings(true)}
+                onClick={() => router.push(`/room/${id}/settings`)}
                 className="bg-muted text-zinc-300 w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-700 active:scale-95 transition-all"
               >
                 ⚙️
@@ -686,7 +751,14 @@ export default function RoomPage() {
             )}
           </div>
         </div>
-        <p className="text-zinc-400 text-sm flex items-center justify-between mt-1">
+
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl font-bold font-mono">Split Bill</h1>
+          <div className="bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider font-bold">
+            {session.splitMode === "even" ? "⚖️ Even Split" : "🎯 By Item"}
+          </div>
+        </div>
+        <div className="text-zinc-400 text-sm flex items-center justify-between mb-6">
           <span>
             Paid by <span className="text-brand font-medium">{session.paidBy}</span>
             {isOwner && <span className="text-zinc-600 text-xs ml-2">· You're the host</span>}
@@ -694,12 +766,47 @@ export default function RoomPage() {
           {isOwner && session.status === "splitting" && (
             <button
               onClick={() => router.push(`/scan?session=${session.id}`)}
-              className="text-zinc-500 hover:text-brand text-xs font-semibold flex items-center gap-1 transition-all"
+              className="bg-brand/10 text-brand border border-brand/20 hover:bg-brand/20 active:scale-95 px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
-              🔄 Rescan / Edit items
+              🔄 Rescan / Edit
             </button>
           )}
-        </p>
+        </div>
+
+        {/* Share room link card */}
+        <div className="flex gap-2 mb-6">
+          <div
+            className="flex-1 bg-surface rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform"
+            onClick={handleShare}
+          >
+            <div>
+              <p className="text-zinc-400 text-xs">Share invite link — tap to share</p>
+              <p className="text-brand font-mono font-semibold tracking-widest">{session.code}</p>
+            </div>
+            <span className="text-xl">
+              {linkCopied ? "✅" : "🔗"}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowShareQR(true)}
+            className="bg-surface border border-zinc-700 rounded-xl px-4 flex items-center justify-center hover:bg-zinc-800 active:scale-[0.98] transition-transform text-zinc-400 hover:text-white"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="5" height="5" x="3" y="3" rx="1" />
+              <rect width="5" height="5" x="16" y="3" rx="1" />
+              <rect width="5" height="5" x="3" y="16" rx="1" />
+              <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+              <path d="M21 21v.01" />
+              <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+              <path d="M3 12h.01" />
+              <path d="M12 3h.01" />
+              <path d="M12 16v.01" />
+              <path d="M16 12h1" />
+              <path d="M21 12v.01" />
+              <path d="M12 21v-1" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -721,47 +828,64 @@ export default function RoomPage() {
       {/* ── SPLIT TAB ── */}
       {tab === "split" && (
         <div className="px-4 space-y-6">
+          {/* Dropdown Backdrop */}
+          {activeParticipantMenu && (
+            <div className="fixed inset-0 z-40" onClick={() => setActiveParticipantMenu(null)} />
+          )}
+
           {/* Participants */}
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Participants</p>
             <div className="flex flex-wrap gap-2">
               {session.participants.map((p) => (
-                <div
-                  key={p.name}
-                  className={clsx(
-                    "px-3 py-1.5 rounded-xl text-sm font-medium flex items-center gap-1",
-                    p.name === session.paidBy
-                      ? "bg-brand/20 text-brand border border-brand/30"
-                      : p.name === myName
-                        ? "bg-muted text-white border border-zinc-600"
-                        : "bg-muted text-zinc-300"
-                  )}
-                >
-                  <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
-                  {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
-                  {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
-                  {/* Owner controls: claim link & select items */}
-                  {isOwner && p.name !== myName && (
-                    <div className="flex items-center gap-1 ml-1 pl-1 border-l border-zinc-700/50">
+                <div key={p.name} className="relative">
+                  <button
+                    onClick={() => {
+                      if (isOwner && p.name !== myName) {
+                        setActiveParticipantMenu(activeParticipantMenu === p.name ? null : p.name);
+                      }
+                    }}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-xl text-sm font-medium flex items-center gap-1 transition-all",
+                      p.name === session.paidBy
+                        ? "bg-brand/20 text-brand border border-brand/30"
+                        : p.name === myName
+                          ? "bg-muted text-white border border-zinc-600"
+                          : "bg-muted text-zinc-300",
+                      isOwner && p.name !== myName ? "hover:ring-2 hover:ring-brand/50 cursor-pointer" : "cursor-default"
+                    )}
+                  >
+                    <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
+                    {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
+                    {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
+                    {isOwner && p.name !== myName && (
+                      <span className="ml-1 text-zinc-500 text-[10px]">▼</span>
+                    )}
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {activeParticipantMenu === p.name && (
+                    <div className="absolute top-full mt-2 left-0 bg-surface border border-zinc-700/50 rounded-xl shadow-2xl p-1 z-50 flex flex-col min-w-[160px] animate-in slide-in-from-top-2 duration-200">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           copyClaimLink(p.name);
+                          setActiveParticipantMenu(null);
                         }}
-                        className="text-[10px] text-zinc-500 hover:text-brand transition-colors p-1"
-                        title="Copy claim link for this person"
+                        className="text-left px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg flex items-center gap-2 transition-colors"
                       >
-                        {friendLinkCopied === p.name ? "✅" : "🔗"}
+                        <span className="text-lg">{friendLinkCopied === p.name ? "✅" : "🔗"}</span>
+                        Share claim link
                       </button>
                       {session.splitMode === "byItem" && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             setSelectForFriend(p.name);
+                            setActiveParticipantMenu(null);
                           }}
-                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand/20 text-brand hover:bg-brand/30 transition-colors whitespace-nowrap"
+                          className="text-left px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg flex items-center gap-2 transition-colors"
                         >
-                          Select items
+                          <span className="text-lg">🎯</span>
+                          Help pick items
                         </button>
                       )}
                     </div>
@@ -819,7 +943,7 @@ export default function RoomPage() {
 
 
           {/* Items Container with Receipt Theme */}
-          <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
+          <div className="receipt-bg rounded-[10px] px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
             {renderItemsList(myName)}
           </div>
 
@@ -838,16 +962,31 @@ export default function RoomPage() {
               <p className="text-brand font-bold text-2xl font-mono">RM {myTotal.toFixed(2)}</p>
             </div>
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Summary</p>
-            {session.participants.map((p) => (
-              <div key={p.name} className="flex justify-between items-center">
-                <span className={clsx("text-sm", p.name === myName && "text-brand font-medium")}>
-                  <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
+            {session.participants.map((p) => {
+              const baseTotal = totals?.[p.name] ?? 0;
+              const displayTotal = p.name === session.paidBy ? Math.max(0, baseTotal - unclaimedAmount) : baseTotal;
+
+              return (
+                <div key={p.name} className="flex justify-between items-center">
+                  <span className={clsx("text-sm", p.name === myName && "text-brand font-medium")}>
+                    <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
+                  </span>
+                  <span className="font-mono text-sm text-white">
+                    RM {displayTotal.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+            {unclaimedAmount > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm italic text-zinc-400">
+                  <span className="mr-1.5 text-lg"></span>Unclaimed items
                 </span>
-                <span className="font-mono text-sm text-white">
-                  RM {(totals?.[p.name] ?? 0).toFixed(2)}
+                <span className="font-mono text-sm text-zinc-400">
+                  RM {unclaimedAmount.toFixed(2)}
                 </span>
               </div>
-            ))}
+            )}
             {(session.serviceCharge > 0 || session.sst > 0 || addedItemsTotal > 0) && (
               <div className="border-t border-muted pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-zinc-400 text-xs">
@@ -908,7 +1047,7 @@ export default function RoomPage() {
                 const myShare = totals?.[myName] ?? 0;
                 let collected = 0;
                 let expectedToCollect = 0;
-                
+
                 session.participants.forEach(p => {
                   if (p.name === myName) return;
                   const pTotal = totals?.[p.name] ?? 0;
@@ -918,37 +1057,10 @@ export default function RoomPage() {
                   }
                 });
 
-                let hostActualShare = myShare;
-                let unclaimedAmount = 0;
+                const hostActualShare = Math.max(0, myShare - unclaimedAmount);
 
-                if (session.splitMode === "byItem") {
-                   let unclaimedSubtotal = 0;
-                   const totalSubtotal = session.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
-                   
-                   session.items.forEach(item => {
-                     const price = Number(item.price) || 0;
-                     if (price <= 0) return;
-                     const assignments = getAssignments(item);
-                     const assignedNames = Object.keys(assignments).filter((n) => assignments[n] > 0);
-                     if (assignedNames.length === 0) {
-                       unclaimedSubtotal += price;
-                     } else {
-                       const totalClaimed = assignedNames.reduce((sum, n) => sum + assignments[n], 0);
-                       if (totalClaimed < (item.quantity || 1)) {
-                         unclaimedSubtotal += (price / (item.quantity || 1)) * ((item.quantity || 1) - totalClaimed);
-                       }
-                     }
-                   });
-
-                   if (unclaimedSubtotal > 0 && totalSubtotal > 0) {
-                     const ratioUnclaimed = unclaimedSubtotal / totalSubtotal;
-                     unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed;
-                     hostActualShare = Math.max(0, myShare - unclaimedAmount);
-                   }
-                }
-                
                 const remaining = Math.max(0, expectedToCollect - collected);
-                
+
                 const actualSharePct = grandTotal > 0 ? (hostActualShare / grandTotal) * 100 : 0;
                 const unclaimedPct = grandTotal > 0 ? (unclaimedAmount / grandTotal) * 100 : 0;
                 const collectedPct = grandTotal > 0 ? (collected / grandTotal) * 100 : 0;
@@ -959,11 +1071,11 @@ export default function RoomPage() {
                   #00C16E ${actualSharePct + unclaimedPct}% ${actualSharePct + unclaimedPct + collectedPct}%, 
                   #fbbf24 ${actualSharePct + unclaimedPct + collectedPct}% 100%
                 )`;
-                
+
                 return (
                   <div className="bg-surface border border-zinc-700/50 rounded-2xl p-5 mb-4 shadow-lg">
                     <p className="text-xs text-zinc-500 uppercase tracking-wide mb-5 font-semibold">Your Collection Summary</p>
-                    
+
                     <div className="flex items-center gap-6">
                       {/* Donut Chart */}
                       <div className="relative w-28 h-28 flex-shrink-0 rounded-full flex items-center justify-center" style={{ background: gradientString }}>
@@ -1011,7 +1123,7 @@ export default function RoomPage() {
                   </div>
                 );
               })()}
-              
+
               <div className="bg-surface rounded-2xl p-4">
                 <p className="text-zinc-400 text-xs uppercase tracking-wide mb-3">Participant Status</p>
                 <div className="space-y-3">
@@ -1283,290 +1395,270 @@ export default function RoomPage() {
             }
 
             return (
-            <div className="space-y-4">
-              {/* Top amount display */}
-              <div className="bg-surface rounded-2xl p-6 text-center">
-                <p className="text-zinc-400 text-sm mb-1">
-                  {hasUnpaidAddOns ? "Add-on balance" : "You owe"}
-                </p>
-                <p className="text-4xl font-bold font-mono text-white mb-1">
-                  RM {amountToPay.toFixed(2)}
-                </p>
-                <p className="text-zinc-500 text-sm">to {s.paidBy}</p>
-              </div>
-
-              {/* Box 1: Paid items (shown when user has paid) */}
-              {myParticipant?.hasPaid && (
-                <div className="bg-brand/5 border border-brand/20 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-brand text-xs font-semibold uppercase tracking-wide">✅ Paid</span>
-                    {myParticipant.paymentMethod && (
-                      <span className="text-zinc-500 text-xs">
-                        via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 TNG" : "💳 Other"}
-                      </span>
-                    )}
-                    <span className="ml-auto text-brand font-mono text-sm font-bold">
-                      RM {receiptSubtotal.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1 opacity-70">
-                    {renderItemList(receiptItems)}
-                  </div>
+              <div className="space-y-4">
+                {/* Top amount display */}
+                <div className="bg-surface rounded-2xl p-6 text-center">
+                  <p className="text-zinc-400 text-sm mb-1">
+                    {hasUnpaidAddOns ? "Add-on balance" : "You owe"}
+                  </p>
+                  <p className="text-4xl font-bold font-mono text-white mb-1">
+                    RM {amountToPay.toFixed(2)}
+                  </p>
+                  <p className="text-zinc-500 text-sm">to {s.paidBy}</p>
                 </div>
-              )}
 
-              {/* Box 2: Unpaid add-ons (or full item list if not paid yet) */}
-              {hasUnpaidAddOns ? (
-                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wide">⚡ Add-ons (unpaid)</span>
-                    <span className="ml-auto text-yellow-400 font-mono text-sm font-bold">
-                      RM {addOnSubtotal.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {renderItemList(addedItems)}
-                  </div>
-                </div>
-              ) : !myParticipant?.hasPaid && (
-                <div className="bg-surface rounded-2xl p-4">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Your items</p>
-                  <div className="space-y-1.5">
-                    {renderItemList(s.items)}
-                    {/* Service charge and SST */}
-                    {(() => {
-                      const mySubtotal = s.items.reduce((sum, item) => {
-                        return sum + (s.splitMode === "byItem"
-                          ? getItemShare(item, myName, s.participants.length, isLocked, s.paidBy)
-                          : (Number(item.price) || 0) / s.participants.length);
-                      }, 0);
-                      const totalSubtotal = s.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-                      const ratio = totalSubtotal > 0 ? mySubtotal / totalSubtotal : 1 / s.participants.length;
-                      const myServiceCharge = (s.serviceCharge || 0) * ratio;
-                      const mySst = (s.sst || 0) * ratio;
-                      return (s.serviceCharge > 0 || s.sst > 0) ? (
-                        <div className="border-t border-zinc-700/50 pt-2 mt-2 space-y-1">
-                          <div className="flex justify-between text-xs text-zinc-400">
-                            <span>Subtotal</span>
-                            <span className="font-mono">RM {mySubtotal.toFixed(2)}</span>
-                          </div>
-                          {s.serviceCharge > 0 && (
-                            <div className="flex justify-between text-xs text-zinc-400">
-                              <span>Service Charge</span>
-                              <span className="font-mono">RM {myServiceCharge.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {s.sst > 0 && (
-                            <div className="flex justify-between text-xs text-zinc-400">
-                              <span>SST</span>
-                              <span className="font-mono">RM {mySst.toFixed(2)}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : null;
-                    })()}
-                    <div className="border-t border-muted pt-1.5 mt-1.5 flex justify-between">
-                      <span className="text-zinc-400 text-sm font-medium">Total</span>
-                      <span className="text-white font-mono text-sm font-semibold">
-                        RM {myTotal.toFixed(2)}
+                {/* Box 1: Paid items (shown when user has paid) */}
+                {myParticipant?.hasPaid && (
+                  <div className="bg-brand/5 border border-brand/20 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-brand text-xs font-semibold uppercase tracking-wide">✅ Paid</span>
+                      {myParticipant.paymentMethod && (
+                        <span className="text-zinc-500 text-xs">
+                          via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 TNG" : "💳 Other"}
+                        </span>
+                      )}
+                      <span className="ml-auto text-brand font-mono text-sm font-bold">
+                        RM {receiptSubtotal.toFixed(2)}
                       </span>
                     </div>
+                    <div className="space-y-1 opacity-70">
+                      {renderItemList(receiptItems)}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Hidden file input for proof upload */}
-              <input
-                ref={proofInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleProofUpload}
-                className="hidden"
-              />
-
-              {/* Payment flow */}
-              {myParticipant?.hasPaid && !hasUnpaidAddOns ? (
-                <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center space-y-2">
-                  <p className="text-brand font-semibold">✓ You're all paid up!</p>
-                  {myParticipant.paymentMethod && (
-                    <p className="text-zinc-400 text-xs">
-                      via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 Touch 'n Go" : "💳 Other"}
-                    </p>
-                  )}
-                </div>
-              ) : !paymentMethod ? (
-                /* Step 1: Choose payment method */
-                <div className="space-y-3">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">
-                    {hasUnpaidAddOns ? "Pay add-on balance" : "How are you paying?"}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => setPaymentMethod("tng")}
-                      className="bg-[#015ABF] hover:bg-[#0147a0] text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
-                    >
-                      <span className="text-2xl">💚</span>
-                      TNG
-                    </button>
-                    <button
-                      onClick={() => setPaymentMethod("cash")}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
-                    >
-                      <span className="text-2xl">💵</span>
-                      Cash
-                    </button>
-                    <button
-                      onClick={() => setPaymentMethod("other")}
-                      className="bg-muted hover:bg-zinc-700 text-zinc-300 font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
-                    >
-                      <span className="text-2xl">💳</span>
-                      Other
-                    </button>
+                {/* Box 2: Unpaid add-ons (or full item list if not paid yet) */}
+                {hasUnpaidAddOns ? (
+                  <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wide">⚡ Add-ons (unpaid)</span>
+                      <span className="ml-auto text-yellow-400 font-mono text-sm font-bold">
+                        RM {addOnSubtotal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {renderItemList(addedItems)}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                /* Step 2: Payment confirmation with proof */
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">
-                      Paying via {paymentMethod === "tng" ? "💚 Touch 'n Go" : paymentMethod === "cash" ? "💵 Cash" : "💳 Other"}
-                    </p>
-                    <button
-                      onClick={() => { setPaymentMethod(null); setProofImage(null); }}
-                      className="text-zinc-500 text-xs hover:text-zinc-300 transition-colors"
-                    >
-                      ← Change
-                    </button>
-                  </div>
-
-                  {/* TNG: Open TNG app button */}
-                  {paymentMethod === "tng" && (
-                    <div className="space-y-3">
-                      <div className="bg-brand/10 border border-brand/20 p-3 rounded-xl mb-4">
-                        <p className="text-brand font-bold text-sm mb-1">TNG Payment Guidelines</p>
-                        <p className="text-brand text-xs">There are 2 ways to pay via TNG:</p>
-                        <ul className="text-brand text-xs list-disc pl-4 mt-1">
-                          <li>Save the host's payment QR below and scan it in the TNG app.</li>
-                          <li>Copy the host's phone number and transfer directly in the app.</li>
-                        </ul>
+                ) : !myParticipant?.hasPaid && (
+                  <div className="bg-surface rounded-2xl p-4">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Your items</p>
+                    <div className="space-y-1.5">
+                      {renderItemList(s.items)}
+                      {/* Service charge and SST */}
+                      {(() => {
+                        const mySubtotal = s.items.reduce((sum, item) => {
+                          return sum + (s.splitMode === "byItem"
+                            ? getItemShare(item, myName, s.participants.length, isLocked, s.paidBy)
+                            : (Number(item.price) || 0) / s.participants.length);
+                        }, 0);
+                        const totalSubtotal = s.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+                        const ratio = totalSubtotal > 0 ? mySubtotal / totalSubtotal : 1 / s.participants.length;
+                        const myServiceCharge = (s.serviceCharge || 0) * ratio;
+                        const mySst = (s.sst || 0) * ratio;
+                        return (s.serviceCharge > 0 || s.sst > 0) ? (
+                          <div className="border-t border-zinc-700/50 pt-2 mt-2 space-y-1">
+                            <div className="flex justify-between text-xs text-zinc-400">
+                              <span>Subtotal</span>
+                              <span className="font-mono">RM {mySubtotal.toFixed(2)}</span>
+                            </div>
+                            {s.serviceCharge > 0 && (
+                              <div className="flex justify-between text-xs text-zinc-400">
+                                <span>Service Charge</span>
+                                <span className="font-mono">RM {myServiceCharge.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {s.sst > 0 && (
+                              <div className="flex justify-between text-xs text-zinc-400">
+                                <span>SST</span>
+                                <span className="font-mono">RM {mySst.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : null;
+                      })()}
+                      <div className="border-t border-muted pt-1.5 mt-1.5 flex justify-between">
+                        <span className="text-zinc-400 text-sm font-medium">Total</span>
+                        <span className="text-white font-mono text-sm font-semibold">
+                          RM {myTotal.toFixed(2)}
+                        </span>
                       </div>
+                    </div>
+                  </div>
+                )}
 
-                      {session.qrImage && (
-                        <div className="bg-surface border border-zinc-700 rounded-2xl p-4 flex flex-col items-center text-center">
-                          <img src={session.qrImage} alt="Payment QR" className="w-48 h-48 rounded-xl object-contain mb-3" />
-                          <p className="text-zinc-400 text-sm mb-4">Host's Payment QR</p>
+                {/* Hidden file input for proof upload */}
+                <input
+                  ref={proofInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleProofUpload}
+                  className="hidden"
+                />
+
+                {/* Payment flow */}
+                {myParticipant?.hasPaid && !hasUnpaidAddOns ? (
+                  <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center space-y-2">
+                    <p className="text-brand font-semibold">✓ You're all paid up!</p>
+                    {myParticipant.paymentMethod && (
+                      <p className="text-zinc-400 text-xs">
+                        via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 Touch 'n Go" : "💳 Other"}
+                      </p>
+                    )}
+                  </div>
+                ) : !paymentMethod ? (
+                  /* Step 1: Choose payment method */
+                  <div className="space-y-3">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">
+                      {hasUnpaidAddOns ? "Pay add-on balance" : "How are you paying?"}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => setPaymentMethod("tng")}
+                        className="bg-[#015ABF] hover:bg-[#0147a0] text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                      >
+                        <span className="text-2xl">💚</span>
+                        TNG
+                      </button>
+                      <button
+                        onClick={() => setPaymentMethod("cash")}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                      >
+                        <span className="text-2xl">💵</span>
+                        Cash
+                      </button>
+                      <button
+                        onClick={() => setPaymentMethod("other")}
+                        className="bg-muted hover:bg-zinc-700 text-zinc-300 font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
+                      >
+                        <span className="text-2xl">💳</span>
+                        Other
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Step 2: Payment confirmation with proof */
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">
+                        Paying via {paymentMethod === "tng" ? "💚 Touch 'n Go" : paymentMethod === "cash" ? "💵 Cash" : "💳 Other"}
+                      </p>
+                      <button
+                        onClick={() => { setPaymentMethod(null); setProofImage(null); }}
+                        className="text-zinc-500 text-xs hover:text-zinc-300 transition-colors"
+                      >
+                        ← Change
+                      </button>
+                    </div>
+
+                    {/* TNG: Open TNG app button */}
+                    {paymentMethod === "tng" && (
+                      <div className="space-y-3">
+                        <div className="bg-brand/10 border border-brand/20 p-3 rounded-xl mb-4">
+                          <p className="text-brand font-bold text-sm mb-1">TNG Payment Guidelines</p>
+                          <p className="text-brand text-xs">There are 2 ways to pay via TNG:</p>
+                          <ul className="text-brand text-xs list-disc pl-4 mt-1">
+                            <li>Save the host's payment QR below and scan it in the TNG app.</li>
+                            <li>Copy the host's phone number and transfer directly in the app.</li>
+                          </ul>
+                        </div>
+
+                        {session.qrImage && (
+                          <div className="bg-surface border border-zinc-700 rounded-2xl p-4 flex flex-col items-center text-center">
+                            <img src={session.qrImage} alt="Payment QR" className="w-48 h-48 rounded-xl object-contain mb-3" />
+                            <p className="text-zinc-400 text-sm mb-4">Host's Payment QR</p>
+                            <button
+                              onClick={handleSaveQR}
+                              className="w-full bg-zinc-800 text-zinc-200 border border-zinc-600 font-bold rounded-xl py-3 text-sm flex items-center justify-center gap-2 hover:bg-zinc-700 active:scale-95 transition-all"
+                            >
+                              <span className="text-lg">📥</span>
+                              1. Save QR to Photos
+                            </button>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={handleTNGPay}
+                          className="w-full bg-[#015ABF] text-white font-bold rounded-2xl py-4 text-base flex flex-col items-center justify-center gap-1 hover:bg-[#0147a0] active:scale-95 transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">💚</span>
+                            {session.qrImage ? "2. Open TNG App" : "Open TNG App"}
+                          </div>
+                          <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
+                        </button>
+
+                        {session.paidByPhone && (
                           <button
-                            onClick={handleSaveQR}
-                            className="w-full bg-zinc-800 text-zinc-200 border border-zinc-600 font-bold rounded-xl py-3 text-sm flex items-center justify-center gap-2 hover:bg-zinc-700 active:scale-95 transition-all"
+                            onClick={(e) => {
+                              navigator.clipboard.writeText(session.paidByPhone);
+                              const btn = e.currentTarget;
+                              const original = btn.innerText;
+                              btn.innerText = "Copied!";
+                              setTimeout(() => (btn.innerText = original), 2000);
+                            }}
+                            className="w-full bg-surface border border-zinc-700 hover:bg-zinc-800 text-zinc-300 font-medium rounded-xl py-3 text-sm active:scale-95 transition-all"
                           >
-                            <span className="text-lg">📥</span>
-                            1. Save QR to Photos
+                            📋 Copy Phone Number ({session.paidByPhone})
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Proof upload */}
+                    <div className="bg-surface rounded-2xl p-4 space-y-3">
+                      <p className="text-zinc-400 text-sm">
+                        {paymentMethod === "cash"
+                          ? "Paid cash? Snap a photo as proof (optional)."
+                          : "Attach a screenshot of your payment as proof (optional)."}
+                      </p>
+
+                      {proofImage ? (
+                        <div className="relative">
+                          <img
+                            src={proofImage}
+                            alt="Payment proof"
+                            className="w-full max-h-48 object-contain rounded-xl border border-zinc-700"
+                          />
+                          <button
+                            onClick={() => setProofImage(null)}
+                            className="absolute top-2 right-2 bg-black/70 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-black/90 transition-colors"
+                          >
+                            ✕
                           </button>
                         </div>
-                      )}
-                      
-                      <button
-                        onClick={handleTNGPay}
-                        className="w-full bg-[#015ABF] text-white font-bold rounded-2xl py-4 text-base flex flex-col items-center justify-center gap-1 hover:bg-[#0147a0] active:scale-95 transition-all"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">💚</span>
-                          {session.qrImage ? "2. Open TNG App" : "Open TNG App"}
-                        </div>
-                        <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
-                      </button>
-
-                      {session.paidByPhone && (
+                      ) : (
                         <button
-                          onClick={(e) => {
-                            navigator.clipboard.writeText(session.paidByPhone);
-                            const btn = e.currentTarget;
-                            const original = btn.innerText;
-                            btn.innerText = "Copied!";
-                            setTimeout(() => (btn.innerText = original), 2000);
-                          }}
-                          className="w-full bg-surface border border-zinc-700 hover:bg-zinc-800 text-zinc-300 font-medium rounded-xl py-3 text-sm active:scale-95 transition-all"
+                          onClick={() => proofInputRef.current?.click()}
+                          className="w-full bg-muted hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-zinc-600"
                         >
-                          📋 Copy Phone Number ({session.paidByPhone})
+                          📷 Attach proof photo
                         </button>
                       )}
                     </div>
-                  )}
 
-                  {/* Proof upload */}
-                  <div className="bg-surface rounded-2xl p-4 space-y-3">
-                    <p className="text-zinc-400 text-sm">
-                      {paymentMethod === "cash"
-                        ? "Paid cash? Snap a photo as proof (optional)."
-                        : "Attach a screenshot of your payment as proof (optional)."}
-                    </p>
-
-                    {proofImage ? (
-                      <div className="relative">
-                        <img
-                          src={proofImage}
-                          alt="Payment proof"
-                          className="w-full max-h-48 object-contain rounded-xl border border-zinc-700"
-                        />
-                        <button
-                          onClick={() => setProofImage(null)}
-                          className="absolute top-2 right-2 bg-black/70 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-black/90 transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => proofInputRef.current?.click()}
-                        className="w-full bg-muted hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-zinc-600"
-                      >
-                        📷 Attach proof photo
-                      </button>
-                    )}
+                    {/* Confirm payment */}
+                    <button
+                      onClick={confirmPayment}
+                      className="w-full bg-brand text-black font-bold rounded-2xl py-5 text-lg flex items-center justify-center gap-2 hover:bg-opacity-90 active:scale-95 transition-all"
+                    >
+                      ✓ Confirm Payment · RM {amountToPay.toFixed(2)}
+                    </button>
                   </div>
-
-                  {/* Confirm payment */}
-                  <button
-                    onClick={confirmPayment}
-                    className="w-full bg-brand text-black font-bold rounded-2xl py-5 text-lg flex items-center justify-center gap-2 hover:bg-opacity-90 active:scale-95 transition-all"
-                  >
-                    ✓ Confirm Payment · RM {amountToPay.toFixed(2)}
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
             );
           })()}
         </div>
       )}
 
       {/* Floating CTA — Split tab only */}
-      {tab === "split" && session.status !== "paying" && isOwner && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent">
-          <button
-            onClick={lockAndPay}
-            disabled={saving}
-            className="w-full max-w-lg mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-40"
-          >
-            Lock Split & Pay →
-          </button>
-        </div>
-      )}
-
-      {tab === "split" && session.status !== "paying" && !isOwner && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent">
-          <div className="w-full max-w-lg mx-auto text-center bg-surface rounded-2xl py-4 px-4">
-            <p className="text-zinc-400 text-sm">Waiting for <span className="text-brand font-medium">{session.owner}</span> to lock the split…</p>
-          </div>
-        </div>
-      )}
-
-      {tab === "split" && session.status === "paying" && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent">
+      {tab === "split" && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent pointer-events-none">
           <button
             onClick={() => setTab("pay")}
-            className="w-full max-w-lg mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all"
+            className="pointer-events-auto w-full max-w-lg mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-2xl"
           >
             Go to Payment →
           </button>
@@ -1607,75 +1699,20 @@ export default function RoomPage() {
         <div className="fixed inset-0 z-50 bg-[#121214] flex flex-col animate-in slide-in-from-bottom-full duration-300">
           <div className="p-4 bg-surface border-b border-zinc-700 flex items-center justify-between pt-8 pb-4">
             <div>
-               <p className="text-zinc-400 text-xs uppercase tracking-widest">Selecting items for</p>
-               <p className="text-white font-bold text-lg flex items-center gap-2"><span className="text-2xl">{session.participants.find(p => p.name === selectForFriend)?.icon || getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
+              <p className="text-zinc-400 text-xs uppercase tracking-widest">Selecting items for</p>
+              <p className="text-white font-bold text-lg flex items-center gap-2"><span className="text-2xl">{session.participants.find(p => p.name === selectForFriend)?.icon || getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
             </div>
             <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pb-32">
-             <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 shadow-2xl relative font-mono max-w-lg mx-auto">
-               {renderItemsList(selectForFriend)}
-             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Room Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => setShowSettings(false)}>
-          <div className="w-full max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-white font-bold text-lg">Room Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition-colors">✕</button>
-            </div>
-            
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Split method</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setSplitMode("even")}
-                    className={clsx(
-                      "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
-                      session.splitMode === "even" ? "bg-brand text-black shadow-[0_0_15px_rgba(0,200,150,0.2)]" : "bg-muted border border-zinc-700/50 text-zinc-300 hover:bg-zinc-800"
-                    )}
-                  >
-                    ⚖️ Split evenly
-                  </button>
-                  <button
-                    onClick={() => setSplitMode("byItem")}
-                    className={clsx(
-                      "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
-                      session.splitMode === "byItem" ? "bg-brand text-black shadow-[0_0_15px_rgba(0,200,150,0.2)]" : "bg-muted border border-zinc-700/50 text-zinc-300 hover:bg-zinc-800"
-                    )}
-                  >
-                    🎯 Choose items
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Manage Participants</p>
-                <div className="bg-muted border border-zinc-700/50 rounded-xl divide-y divide-zinc-700/50">
-                  {session.participants.map(p => (
-                    <div key={p.name} className="flex items-center justify-between p-3">
-                      <span className="text-white text-sm flex items-center gap-2"><span className="text-xl">{p.icon || getAnimalIcon(p.name)}</span> {p.name} {p.name === myName && <span className="text-zinc-500 text-xs">(you)</span>}</span>
-                      {p.name !== myName && (
-                        <button
-                          onClick={() => { handleRemoveParticipant(p.name); setShowSettings(false); }}
-                          className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-semibold hover:bg-red-500/20 transition-colors"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="receipt-bg rounded-[10px] px-5 pb-5 pt-3 shadow-2xl relative font-mono max-w-lg mx-auto">
+              {renderItemsList(selectForFriend)}
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* Share QR Modal */}
       {showShareQR && (
