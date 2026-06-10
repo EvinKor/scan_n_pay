@@ -63,6 +63,7 @@ export default function Home() {
         .from("sessions")
         .select("id, code, created_at, data")
         .contains("data->participants", `[{"name": "${displayName}"}]`)
+        .neq("deleted", true)
         .order("created_at", { ascending: false })
         .limit(10);
       if (data) dbData = data;
@@ -72,7 +73,8 @@ export default function Home() {
       const { data } = await supabase
         .from("sessions")
         .select("id, code, created_at, data")
-        .in("id", localRoomIds);
+        .in("id", localRoomIds)
+        .neq("deleted", true);
       if (data) localData = data;
     }
 
@@ -233,8 +235,8 @@ export default function Home() {
                             <p className="text-zinc-500 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-white font-mono font-bold text-sm leading-none mt-1">RM {grandTotal.toFixed(2)}</p>
-                            <p className="text-zinc-500 text-[9px] uppercase mt-0.5">Total Bill</p>
+                            <p className="text-white font-mono font-bold text-sm leading-none mt-1 whitespace-nowrap">RM {grandTotal.toFixed(2)}</p>
+                            <p className="text-zinc-500 text-[9px] uppercase mt-0.5 whitespace-nowrap">Total Bill</p>
                           </div>
                         </div>
                         <div className="bg-[#121214] rounded-lg p-2 border border-zinc-800/50 w-full mt-2">

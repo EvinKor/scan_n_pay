@@ -31,6 +31,7 @@ export interface Session {
   paidBy: string; // participant name
   paidByPhone: string;
   qrImage?: string; // Base64 of the uploaded payment QR code
+  receiptImage?: string; // Base64 of the scanned receipt
   participants: Participant[];
   items: LineItem[];
   splitMode: "even" | "byItem";
@@ -94,6 +95,7 @@ export async function joinSession(code: string, name: string, icon?: string): Pr
     .from("sessions")
     .select()
     .eq("code", code)
+    .neq("deleted", true)
     .single();
 
   if (error || !data) throw new Error("Room not found");
@@ -126,6 +128,7 @@ export async function getSession(id: string): Promise<Session | null> {
     .from("sessions")
     .select()
     .eq("id", id)
+    .neq("deleted", true)
     .single();
 
   if (error || !data) return null;
@@ -137,6 +140,7 @@ export async function getSessionByCode(code: string): Promise<Session | null> {
     .from("sessions")
     .select()
     .eq("code", code)
+    .neq("deleted", true)
     .single();
 
   if (error || !data) return null;
@@ -298,6 +302,6 @@ export function calculateTotals(session: Session, forceLocked: boolean = false):
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  const { error } = await supabase.from("sessions").delete().eq("id", id);
+  const { error } = await supabase.from("sessions").update({ deleted: true }).eq("id", id);
   if (error) throw new Error(error.message);
 }

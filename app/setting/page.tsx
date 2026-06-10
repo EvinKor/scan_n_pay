@@ -115,7 +115,7 @@ export default function SettingPage() {
   }
 
   return (
-    <main className="min-h-screen pb-32 max-w-lg mx-auto bg-[#0f0f0f] px-6 py-12">
+    <main suppressHydrationWarning className="min-h-screen pb-32 max-w-lg mx-auto bg-[#0f0f0f] px-6 py-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button 

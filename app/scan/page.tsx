@@ -22,6 +22,7 @@ export default function ScanPage() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string>("");
   const [paidBy, setPaidBy] = useState("");
   const [paidByPhone, setPaidByPhone] = useState("");
   const [error, setError] = useState("");
@@ -59,6 +60,26 @@ export default function ScanPage() {
     setScanning(true);
     setProgress(0);
     setError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX = 1200;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        setReceiptBase64(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+
     try {
       const result: ReceiptResult = await extractReceiptItems(file, setProgress);
       if (result.items.length === 0) {
@@ -109,6 +130,7 @@ export default function ScanPage() {
       serviceCharge,
       sst,
       receiptTotal,
+      receiptImage: receiptBase64 || session?.receiptImage,
       status: "splitting",
     });
     router.push(`/room/${sessionId}`);

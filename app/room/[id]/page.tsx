@@ -30,6 +30,7 @@ export default function RoomPage() {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "tng" | "other" | null>(null);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [viewingProof, setViewingProof] = useState<string | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const proofInputRef = useRef<HTMLInputElement>(null);
 
   // Add missing item state
@@ -961,6 +962,18 @@ export default function RoomPage() {
 
 
 
+          {/* Receipt Header & Action */}
+          {session.receiptImage && (
+            <div className="flex justify-end mt-4 mb-2">
+              <button
+                onClick={() => setViewingReceipt(session.receiptImage!)}
+                className="text-xs text-brand underline decoration-brand/50 hover:decoration-brand underline-offset-4 flex items-center gap-1.5 transition-colors"
+              >
+                <span>🧾</span> View Scanned Receipt
+              </button>
+            </div>
+          )}
+
           {/* Items Container with Receipt Theme */}
           <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-2xl relative z-10 font-mono">
             {renderItemsList(myName)}
@@ -1725,12 +1738,38 @@ export default function RoomPage() {
                 ✕
               </button>
             </div>
-            <div className="p-4">
+            <div className="p-4 bg-zinc-900 flex justify-center max-h-[80vh] overflow-y-auto">
               <img
                 src={viewingProof}
                 alt="Payment proof"
-                className="w-full rounded-xl"
+                className="max-w-full h-auto rounded-lg"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scanned Receipt Modal */}
+      {viewingReceipt && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setViewingReceipt(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-surface rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700">
+              <h3 className="font-bold text-white text-sm">Scanned Receipt</h3>
+              <button
+                onClick={() => setViewingReceipt(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 bg-zinc-900 flex justify-center max-h-[80vh] overflow-y-auto">
+              <img src={viewingReceipt} alt="Scanned Receipt" className="max-w-full h-auto rounded-lg" />
             </div>
           </div>
         </div>
