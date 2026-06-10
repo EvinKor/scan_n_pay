@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   description: "Scan receipts, split bills, pay via TNG",
   manifest: "/manifest.json",
   themeColor: "#00c896",
+  icons: {
+    icon: "/app_icon.png",
+    apple: "/app_icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

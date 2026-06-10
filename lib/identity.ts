@@ -4,32 +4,42 @@ const ROOM_KEY_PREFIX = "splitlah_room_";
 export interface LocalUser {
   name: string;
   sessionId: string;
+  icon?: string;
 }
 
 // ── Per-Room Identity ──
 
 /** Save identity for a specific room */
-export function setLocalUserForRoom(sessionId: string, name: string) {
+export function setLocalUserForRoom(sessionId: string, name: string, icon?: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(`${ROOM_KEY_PREFIX}${sessionId}`, name);
+  const data = JSON.stringify({ name, icon });
+  localStorage.setItem(`${ROOM_KEY_PREFIX}${sessionId}`, data);
   // Also update legacy key for backward compat
-  setLocalUser({ name, sessionId });
+  setLocalUser({ name, sessionId, icon });
 }
 
 /** Get identity for a specific room */
-export function getLocalUserForRoom(sessionId: string): string | null {
+export function getLocalUserForRoom(sessionId: string): { name: string; icon?: string } | null {
   if (typeof window === "undefined") return null;
   try {
     // Try per-room key first
-    const roomName = localStorage.getItem(`${ROOM_KEY_PREFIX}${sessionId}`);
-    if (roomName) return roomName;
+    const roomData = localStorage.getItem(`${ROOM_KEY_PREFIX}${sessionId}`);
+    if (roomData) {
+      try {
+        const parsed = JSON.parse(roomData);
+        if (parsed.name) return parsed;
+      } catch {
+        // Fallback for old simple string format
+        return { name: roomData };
+      }
+    }
 
     // Fallback: check legacy global key and migrate if it matches this room
     const legacy = getLocalUser();
     if (legacy && legacy.sessionId === sessionId) {
       // Migrate to per-room storage
-      localStorage.setItem(`${ROOM_KEY_PREFIX}${sessionId}`, legacy.name);
-      return legacy.name;
+      setLocalUserForRoom(sessionId, legacy.name, legacy.icon);
+      return { name: legacy.name, icon: legacy.icon };
     }
 
     return null;

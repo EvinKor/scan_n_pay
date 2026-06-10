@@ -14,6 +14,7 @@ export interface LineItem {
 
 export interface Participant {
   name: string;
+  icon?: string;
   tngPhone?: string;
   hasPaid: boolean;
   paymentMethod?: "cash" | "tng" | "other";
@@ -46,7 +47,12 @@ function generateCode(): string {
   return `${word}-${suffix}`;
 }
 
-export async function createSession(creatorName: string, splitMode: "even" | "byItem" = "even", qrImage?: string): Promise<Session> {
+export async function createSession(
+  creatorName: string, 
+  splitMode: "even" | "byItem" = "even", 
+  qrImage?: string,
+  creatorIcon?: string
+): Promise<Session> {
   const code = generateCode();
   const session: Omit<Session, "id" | "createdAt"> = {
     code,
@@ -54,7 +60,7 @@ export async function createSession(creatorName: string, splitMode: "even" | "by
     paidBy: "",
     paidByPhone: "",
     qrImage,
-    participants: [{ name: creatorName, hasPaid: false }],
+    participants: [{ name: creatorName, icon: creatorIcon, hasPaid: false }],
     items: [],
     splitMode,
     status: "scanning",
@@ -74,7 +80,7 @@ export async function createSession(creatorName: string, splitMode: "even" | "by
   return { ...session, id: data.id, createdAt: data.created_at };
 }
 
-export async function joinSession(code: string, name: string): Promise<Session> {
+export async function joinSession(code: string, name: string, icon?: string): Promise<Session> {
   const { data, error } = await supabase
     .from("sessions")
     .select()
@@ -86,8 +92,9 @@ export async function joinSession(code: string, name: string): Promise<Session> 
   const session: Session = { ...data.data, id: data.id, createdAt: data.created_at };
 
   // Add participant if not already in
-  if (!session.participants.find((p) => p.name === name)) {
-    session.participants.push({ name, hasPaid: false });
+  const existing = session.participants.find((p) => p.name === name);
+  if (!existing) {
+    session.participants.push({ name, icon, hasPaid: false });
     const patch: Partial<Session> = { participants: session.participants };
     if (session.status === "paying" || session.status === "done") {
       patch.totals = calculateTotals(session);
@@ -96,6 +103,10 @@ export async function joinSession(code: string, name: string): Promise<Session> 
     if (patch.totals) {
       session.totals = patch.totals;
     }
+  } else if (icon && existing.icon !== icon) {
+    // Update icon if they rejoined with a new icon
+    existing.icon = icon;
+    await updateSession(data.id, { participants: session.participants });
   }
 
   return session;

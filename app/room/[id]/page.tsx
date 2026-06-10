@@ -53,7 +53,7 @@ export default function RoomPage() {
   // Per-room identity
   const roomUser = getLocalUserForRoom(id);
   const legacyUser = getLocalUser();
-  const myName = roomUser || legacyUser?.name || "";
+  const myName = roomUser?.name || legacyUser?.name || "";
 
   // Load + subscribe
   useEffect(() => {
@@ -732,7 +732,7 @@ export default function RoomPage() {
                         : "bg-muted text-zinc-300"
                   )}
                 >
-                  <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name}
+                  <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
                   {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                   {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
                   {/* Owner controls: claim link & select items */}
@@ -836,7 +836,7 @@ export default function RoomPage() {
             {session.participants.map((p) => (
               <div key={p.name} className="flex justify-between items-center">
                 <span className={clsx("text-sm", p.name === myName && "text-brand font-medium")}>
-                  <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
+                  <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
                 </span>
                 <span className="font-mono text-sm text-white">
                   RM {(totals?.[p.name] ?? 0).toFixed(2)}
@@ -1031,7 +1031,7 @@ export default function RoomPage() {
                                       )}
                                     />
                                     <span className="text-sm text-white font-medium">
-                                      <span className="mr-1.5 text-lg">{getAnimalIcon(p.name)}</span>{p.name}
+                                      <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
                                     </span>
                                     {isFullyPaid && (
                                       <span className="text-brand text-xs flex items-center gap-1">
@@ -1603,7 +1603,7 @@ export default function RoomPage() {
           <div className="p-4 bg-surface border-b border-zinc-700 flex items-center justify-between pt-8 pb-4">
             <div>
                <p className="text-zinc-400 text-xs uppercase tracking-widest">Selecting items for</p>
-               <p className="text-white font-bold text-lg flex items-center gap-2"><span className="text-2xl">{getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
+               <p className="text-white font-bold text-lg flex items-center gap-2"><span className="text-2xl">{session.participants.find(p => p.name === selectForFriend)?.icon || getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
             </div>
             <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
           </div>
@@ -1654,7 +1654,7 @@ export default function RoomPage() {
                 <div className="bg-muted border border-zinc-700/50 rounded-xl divide-y divide-zinc-700/50">
                   {session.participants.map(p => (
                     <div key={p.name} className="flex items-center justify-between p-3">
-                      <span className="text-white text-sm flex items-center gap-2"><span className="text-xl">{getAnimalIcon(p.name)}</span> {p.name} {p.name === myName && <span className="text-zinc-500 text-xs">(you)</span>}</span>
+                      <span className="text-white text-sm flex items-center gap-2"><span className="text-xl">{p.icon || getAnimalIcon(p.name)}</span> {p.name} {p.name === myName && <span className="text-zinc-500 text-xs">(you)</span>}</span>
                       {p.name !== myName && (
                         <button
                           onClick={() => { handleRemoveParticipant(p.name); setShowSettings(false); }}
