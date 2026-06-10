@@ -86,6 +86,7 @@ export default function RoomPage() {
     // Fallback polling (in case Supabase Realtime is not enabled on the sessions table)
     const pollInterval = setInterval(() => {
       getSession(id).then((s) => {
+        if (isMutating.current) return;
         if (s) setSession(s);
       });
     }, 3000);
@@ -158,12 +159,26 @@ export default function RoomPage() {
     const items = session.items.map((item) => {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
-      const alreadyHas = (assignments[targetName] || 0) > 0;
-      if (alreadyHas) {
-        delete assignments[targetName];
+      const currentClaim = assignments[targetName] || 0;
+      
+      const totalQty = item.quantity || 1;
+      const totalClaimedOthers = Object.entries(assignments)
+        .filter(([name]) => name !== targetName)
+        .reduce((sum, [, qty]) => sum + qty, 0);
+      const maxAvailableForMe = Math.max(0, totalQty - totalClaimedOthers);
+
+      if (currentClaim === 0) {
+        if (maxAvailableForMe > 0) {
+          assignments[targetName] = 1;
+        }
       } else {
-        assignments[targetName] = 1;
+        if (currentClaim < maxAvailableForMe) {
+          assignments[targetName] = currentClaim + 1;
+        } else {
+          delete assignments[targetName];
+        }
       }
+
       return {
         ...item,
         assignedTo: assignments,
@@ -532,14 +547,11 @@ export default function RoomPage() {
               <div className="flex items-center gap-2">
                 <span className="text-black text-sm truncate font-bold">{item.name}</span>
                 {(item.quantity ?? 1) > 1 && (
-                  <span className="text-gray-500 text-xs flex-shrink-0 font-bold">×{item.quantity}</span>
-                )}
-                {s.splitMode === "byItem" && totalQty > 1 && (
                   <span className={clsx(
-                    "px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0",
-                    qtyLeft > 0 ? "bg-brand/20 text-brand" : "bg-gray-200 text-gray-500"
+                    "text-xs flex-shrink-0 font-bold",
+                    s.splitMode === "byItem" && qtyLeft > 0 ? "text-brand" : "text-gray-500"
                   )}>
-                    {qtyLeft} left
+                    {s.splitMode === "byItem" ? `×${qtyLeft} left` : `×${item.quantity}`}
                   </span>
                 )}
               </div>
@@ -554,38 +566,13 @@ export default function RoomPage() {
             </div>
           </div>
 
-          {/* Quantity Adjuster for Claimed Items */}
-          {s.splitMode === "byItem" && isMine && item.quantity > 1 && canInteract && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 bg-zinc-800 rounded-lg p-1 mx-2 flex-shrink-0"
-            >
-              <button
-                onClick={() => adjustClaimedQuantity(item.id, -1, targetName)}
-                className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-              >
-                -
-              </button>
-              <span className="text-white text-sm font-mono px-1 min-w-[12px] text-center">
-                {myClaimedQty}
-              </span>
-              <button
-                onClick={() => adjustClaimedQuantity(item.id, 1, targetName)}
-                className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-zinc-600 active:scale-90 transition-all font-bold text-sm"
-                disabled={qtyLeft <= 0 || myClaimedQty >= item.quantity}
-              >
-                +
-              </button>
-            </div>
-          )}
-
           <div className="text-right flex-shrink-0 ml-2">
             <span className="text-black font-mono text-sm font-bold">
               RM {(Number(item.price) || 0).toFixed(2)}
             </span>
             {s.splitMode === "byItem" && isMine && (
-              <p className="text-brand text-xs font-mono font-bold">
-                your share: RM {myShare.toFixed(2)}
+              <p className="text-brand text-xs font-mono font-bold mt-1">
+                share: RM {myShare.toFixed(2)}
               </p>
             )}
           </div>
