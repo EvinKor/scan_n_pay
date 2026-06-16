@@ -1,14 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --brand: #00c896;
-  --dark: #0f0f0f;
-  --surface: #1a1a1a;
-  --muted: #2a2a2a;
+  /* Deep Obsidian Green Aesthetic - RGB values for Tailwind opacity support */
+  --background: 10 13 10;     /* #0A0D0A */
+  --surface: 19 26 19;        /* #131A13 */
+  --muted: 30 41 30;          /* #1E291E */
+  --divider: 44 58 44;        /* #2C3A2C */
+  --main: 243 246 243;        /* #F3F6F3 */
+  --subtle: 139 158 139;      /* #8B9E8B */
+  --brand: 0 200 150;         /* #00C896 */
 }
 
 * {
@@ -16,25 +20,29 @@
 }
 
 html, body {
-  background: var(--dark);
-  color: #f0f0f0;
-  font-family: 'DM Sans', sans-serif;
+  background: rgb(var(--background));
+  color: rgb(var(--main));
+  font-family: 'Outfit', sans-serif;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  background-image: 
+    radial-gradient(circle at top right, rgba(0, 200, 150, 0.05), transparent 400px),
+    radial-gradient(circle at bottom left, rgba(0, 200, 150, 0.03), transparent 400px);
+  background-attachment: fixed;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--dark); }
-::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 4px; }
+::-webkit-scrollbar-track { background: rgb(var(--background)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--divider)); border-radius: 4px; }
 
 @layer utilities {
   .font-mono { font-family: 'DM Mono', monospace; }
 
   /* Receipt Theme Background */
   .receipt-bg {
-    background-color: #fdfdf9; /* off-white paper */
-    color: #1a1a1a;
+    background-color: rgb(var(--surface)); /* dark paper */
+    color: rgb(var(--main));
   }
 
   .receipt-edge-top {

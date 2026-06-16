@@ -115,16 +115,16 @@ export default function SettingPage() {
   }
 
   return (
-    <main suppressHydrationWarning className="min-h-screen pb-32 max-w-lg mx-auto bg-[#0f0f0f] px-6 py-12">
+    <main suppressHydrationWarning className="min-h-screen pb-32 max-w-lg mx-auto bg-background px-6 py-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button 
           onClick={() => router.back()} 
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors"
         >
           ←
         </button>
-        <h1 className="text-xl font-bold text-white">Settings</h1>
+        <h1 className="text-xl font-bold text-main">Settings</h1>
         <div className="w-10" /> {/* spacer */}
       </div>
 
@@ -135,27 +135,27 @@ export default function SettingPage() {
       ) : (
         <div className="space-y-8">
           {/* Profile Section */}
-          <section className="bg-surface border border-zinc-700 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-white font-bold mb-4">Edit Profile</h2>
+          <section className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
+            <h2 className="text-main font-bold mb-4">Edit Profile</h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">Display Name</label>
+                <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Display Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+                  className="w-full bg-muted border border-divider rounded-xl px-4 py-3 text-main text-sm focus:outline-none focus:border-brand transition-colors"
                   maxLength={24}
                 />
               </div>
 
               <div>
-                <label className="text-zinc-500 text-xs uppercase tracking-wide mb-2 block">Choose Icon</label>
+                <label className="text-subtle text-xs uppercase tracking-wide mb-2 block">Choose Icon</label>
                 <div className="grid grid-cols-5 gap-2">
                   <button
                     onClick={() => setIcon("")}
-                    className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${!icon ? "bg-brand text-black shadow-[0_0_10px_rgba(0,200,150,0.2)]" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                    className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${!icon ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted text-subtle hover:bg-divider"}`}
                   >
                     🎲
                   </button>
@@ -163,13 +163,13 @@ export default function SettingPage() {
                     <button
                       key={e}
                       onClick={() => setIcon(e)}
-                      className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${icon === e ? "bg-brand text-black shadow-[0_0_10px_rgba(0,200,150,0.2)]" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                      className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${icon === e ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted text-subtle hover:bg-divider"}`}
                     >
                       {e}
                     </button>
                   ))}
                 </div>
-                <p className="text-zinc-500 text-[10px] mt-2">
+                <p className="text-subtle text-[10px] mt-2">
                   {!icon ? "🎲 Random animal icon (default)" : `Selected: ${icon}`}
                 </p>
               </div>
@@ -177,10 +177,10 @@ export default function SettingPage() {
 
 
               <div>
-                <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 block">
+                <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">
                   Default TNG/DuitNow QR
                 </label>
-                <div className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
+                <div className="relative group cursor-pointer border-2 border-dashed border-divider rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
                   <input
                     type="file"
                     accept="image/*"
@@ -195,8 +195,8 @@ export default function SettingPage() {
                   ) : (
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-2xl">📱</span>
-                      <span className="text-zinc-400 text-sm">Upload QR Code</span>
-                      <span className="text-zinc-600 text-xs">Used as default for new bills</span>
+                      <span className="text-subtle text-sm">Upload QR Code</span>
+                      <span className="text-subtle text-xs">Used as default for new bills</span>
                     </div>
                   )}
                 </div>
@@ -208,7 +208,7 @@ export default function SettingPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || !name.trim()}
-                className="w-full bg-brand text-black font-bold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50 mt-4"
+                className="w-full bg-brand text-white font-bold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50 mt-4"
               >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
@@ -217,34 +217,34 @@ export default function SettingPage() {
 
           {/* History */}
           <section className="space-y-3">
-            <h2 className="text-zinc-500 text-xs uppercase tracking-wide px-2">History</h2>
-            <div className="bg-surface border border-zinc-700 rounded-2xl p-2">
+            <h2 className="text-subtle text-xs uppercase tracking-wide px-2">History</h2>
+            <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-2">
               <button
                 onClick={() => router.push("/history")}
-                className="w-full bg-transparent hover:bg-zinc-800 text-white font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
+                className="w-full bg-transparent hover:bg-muted text-main font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🧾</span>
                   <span>View Past Receipts</span>
                 </div>
-                <span className="text-zinc-500">→</span>
+                <span className="text-subtle">→</span>
               </button>
             </div>
           </section>
 
           {/* Account & App Settings */}
           <section className="space-y-3">
-            <h2 className="text-zinc-500 text-xs uppercase tracking-wide px-2">App Settings</h2>
+            <h2 className="text-subtle text-xs uppercase tracking-wide px-2">App Settings</h2>
             
-            <div className="bg-surface border border-zinc-700 rounded-2xl p-2">
+            <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-2">
               <InstallPWA />
             </div>
 
             {user ? (
-              <div className="bg-surface border border-zinc-700 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <p className="text-white font-semibold">Account</p>
-                  <p className="text-zinc-500 text-xs">{user.email}</p>
+                  <p className="text-main font-semibold">Account</p>
+                  <p className="text-subtle text-xs">{user.email}</p>
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -254,7 +254,7 @@ export default function SettingPage() {
                 </button>
               </div>
             ) : (
-              <button onClick={() => router.push("/login")} className="w-full bg-brand text-black font-semibold rounded-xl py-3 shadow-[0_0_15px_rgba(0,200,150,0.2)]">
+              <button onClick={() => router.push("/login")} className="w-full bg-brand text-white font-semibold rounded-xl py-3 shadow-md shadow-brand/20">
                 Sign In / Sign Up
               </button>
             )}

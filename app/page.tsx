@@ -98,13 +98,10 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
       {/* Logo */}
       <div className="mb-12 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand mb-4">
-          <span className="text-3xl">🧾</span>
+        <div className="w-48 mx-auto mb-2">
+          <img src="/app_icon.png" alt="Split Lah Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
         </div>
-        <h1 className="text-3xl font-bold font-mono text-white tracking-tight">
-          SplitLah
-        </h1>
-        <p className="text-zinc-400 mt-1 text-sm">Scan. Split. Pay via TNG.</p>
+        <p className="text-subtle mt-1 text-sm">Scan. Split. Pay via TNG.</p>
       </div>
 
       {/* User profile or Name input */}
@@ -112,40 +109,40 @@ export default function Home() {
         {user && (
           <button 
             onClick={() => router.push("/setting")}
-            className="absolute -top-20 right-0 w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors z-50"
+            className="absolute -top-20 right-0 w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors z-50"
           >
             ⚙️
           </button>
         )}
 
         {user ? (
-          <div className="bg-surface border border-brand/30 rounded-xl p-4 flex flex-col items-center gap-2">
+          <div className="bg-surface/80 backdrop-blur-md border border-brand/30 rounded-xl p-4 flex flex-col items-center gap-2">
             <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center text-xl">
               {icon || getAnimalIcon(name || user.email)}
             </div>
             <div className="text-center">
-              <p className="text-white font-semibold">Welcome back!</p>
+              <p className="text-main font-semibold">Welcome back!</p>
               <p className="text-brand font-mono">{name || user.email}</p>
             </div>
           </div>
         ) : mode === "idle" ? (
-          <div className="bg-surface border border-zinc-700 rounded-xl p-6 text-center space-y-4 shadow-2xl">
+          <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-xl p-6 text-center space-y-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
             <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-3xl mx-auto mb-2">👋</div>
-            <h2 className="text-white font-bold text-lg">Welcome to SplitLah</h2>
-            <p className="text-zinc-400 text-sm">Log in to save your split history, or continue as a guest.</p>
+            <h2 className="text-main font-bold text-lg">Welcome to SplitLah</h2>
+            <p className="text-subtle text-sm">Log in to save your split history, or continue as a guest.</p>
             
             <div className="space-y-3 pt-2">
-              <button onClick={() => router.push("/login")} className="w-full bg-brand text-black font-bold rounded-xl py-3 hover:bg-opacity-90 transition-all shadow-[0_0_15px_rgba(0,200,150,0.2)]">
+              <button onClick={() => router.push("/login")} className="w-full bg-brand text-white font-bold rounded-xl py-3 hover:bg-opacity-90 transition-all shadow-md shadow-brand/20">
                 Sign In / Sign Up
               </button>
-              <button onClick={() => setMode("guest")} className="w-full bg-zinc-800 text-zinc-300 font-semibold rounded-xl py-3 hover:bg-zinc-700 transition-all">
+              <button onClick={() => setMode("guest")} className="w-full bg-muted text-main font-semibold rounded-xl py-3 hover:bg-divider transition-all">
                 Continue as Guest
               </button>
             </div>
           </div>
         ) : mode === "guest" ? (
           <div>
-            <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 flex justify-between">
+            <label className="text-subtle text-xs uppercase tracking-wide mb-1 flex justify-between">
               <span>Your name</span>
               <button onClick={() => router.push("/login")} className="text-brand hover:underline">Log in to save profile</button>
             </label>
@@ -154,10 +151,10 @@ export default function Home() {
               placeholder="Your display name"
               value={name}
               onChange={(e) => { setName(e.target.value); }}
-              className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
+              className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
               maxLength={24}
             />
-            <p className="text-zinc-600 text-xs mt-1">Random name generated · change it if you want</p>
+            <p className="text-subtle text-xs mt-1">Random name generated · change it if you want</p>
           </div>
         ) : null}
 
@@ -173,7 +170,7 @@ export default function Home() {
                   if (!user && name.trim()) setLocalUser({ name: name.trim(), sessionId: "" });
                   router.push("/create");
                 }}
-                className="bg-brand text-black font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,200,150,0.2)]"
+                className="bg-brand text-white font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20"
               >
                 New Bill
               </button>
@@ -183,7 +180,7 @@ export default function Home() {
                   if (!user && name.trim()) setLocalUser({ name: name.trim(), sessionId: "" });
                   router.push("/join");
                 }}
-                className="bg-surface text-white font-semibold rounded-xl py-3 border border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all"
+                className="bg-surface text-main font-semibold rounded-xl py-3 border border-divider hover:bg-muted active:scale-95 transition-all"
               >
                 Join Room
               </button>
@@ -191,9 +188,9 @@ export default function Home() {
             
             {/* Session History */}
             {history.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-zinc-800">
+              <div className="mt-6 pt-4 border-t border-divider">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Recent Bills</h3>
+                  <h3 className="text-subtle text-xs uppercase tracking-widest font-bold">Recent Bills</h3>
                   {history.length > 3 && (
                     <button
                       onClick={() => router.push("/history")}
@@ -219,7 +216,7 @@ export default function Home() {
                           "relative overflow-hidden w-full rounded-xl p-3 flex flex-col transition-colors text-left border",
                           h.data?.status === "done" 
                             ? "bg-[#015ABF]/10 border-[#015ABF]/30 hover:bg-[#015ABF]/20" 
-                            : "bg-surface border-zinc-700 hover:bg-zinc-800"
+                            : "bg-surface/80 backdrop-blur-md border-divider hover:bg-muted"
                         )}
                       >
                         {h.data?.status === "done" && (
@@ -231,17 +228,17 @@ export default function Home() {
                         )}
                         <div className="flex items-start justify-between w-full mb-2">
                           <div className="relative z-20">
-                            <p className="text-white font-mono font-bold text-sm">{h.data?.name || h.code}</p>
-                            <p className="text-zinc-500 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
+                            <p className="text-main font-mono font-bold text-sm">{h.data?.name || h.code}</p>
+                            <p className="text-subtle text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-white font-mono font-bold text-sm leading-none mt-1 whitespace-nowrap">RM {grandTotal.toFixed(2)}</p>
-                            <p className="text-zinc-500 text-[9px] uppercase mt-0.5 whitespace-nowrap">Total Bill</p>
+                            <p className="text-main font-mono font-bold text-sm leading-none mt-1 whitespace-nowrap">RM {grandTotal.toFixed(2)}</p>
+                            <p className="text-subtle text-[9px] uppercase mt-0.5 whitespace-nowrap">Total Bill</p>
                           </div>
                         </div>
-                        <div className="bg-[#121214] rounded-lg p-2 border border-zinc-800/50 w-full mt-2">
-                          <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-bold mb-0.5">Owner: {h.data?.owner || "Unknown"}</p>
-                          <p className="text-zinc-300 text-xs line-clamp-1">
+                        <div className="bg-background rounded-lg p-2 border border-divider/50 w-full mt-2">
+                          <p className="text-subtle text-[10px] uppercase tracking-widest font-bold mb-0.5">Owner: {h.data?.owner || "Unknown"}</p>
+                          <p className="text-main text-xs line-clamp-1">
                             👥 {participantsList || "Unknown"}
                           </p>
                         </div>
@@ -256,7 +253,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <p className="mt-16 text-zinc-600 text-xs text-center">
+      <p className="mt-16 text-subtle text-xs text-center">
         No account needed · Works offline · Pay via TNG
       </p>
     </main>

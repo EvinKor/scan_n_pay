@@ -65,15 +65,15 @@ export default function JoinPage() {
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12 max-w-sm mx-auto">
       <div className="w-full space-y-6">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface border border-zinc-700 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface/80 backdrop-blur-md border border-divider mb-4">
             <span className="text-3xl">🤝</span>
           </div>
-          <h1 className="text-3xl font-bold font-mono text-white tracking-tight">Join Room</h1>
-          <p className="text-zinc-400 mt-1 text-sm">Enter a code to join your friends</p>
+          <h1 className="text-3xl font-bold font-mono text-main tracking-tight">Join Room</h1>
+          <p className="text-subtle mt-1 text-sm">Enter a code to join your friends</p>
         </div>
 
         <div>
-          <label className="text-zinc-500 text-xs uppercase tracking-wide mb-1 flex justify-between">
+          <label className="text-subtle text-xs uppercase tracking-wide mb-1 flex justify-between">
             <span>Your name</span>
             {!user && <button onClick={() => router.push("/login")} className="text-brand hover:underline">Log in to save profile</button>}
           </label>
@@ -82,16 +82,16 @@ export default function JoinPage() {
             placeholder="Your display name"
             value={name}
             onChange={(e) => { setName(e.target.value); setError(""); }}
-            className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors"
+            className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
             maxLength={24}
           />
-          <p className="text-zinc-600 text-xs mt-1">
+          <p className="text-subtle text-xs mt-1">
             {user ? "You can change your display name for this room" : "Random name generated · change it if you want"}
           </p>
         </div>
 
         <div>
-          <label className="text-zinc-500 text-xs uppercase tracking-wide mb-2 block">
+          <label className="text-subtle text-xs uppercase tracking-wide mb-2 block">
             Room Code
           </label>
           <input
@@ -99,7 +99,7 @@ export default function JoinPage() {
             placeholder="e.g. MAKAN-7X2"
             value={code}
             onChange={(e) => { setCode(e.target.value); setError(""); }}
-            className="w-full bg-surface border border-muted rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-brand transition-colors uppercase font-mono tracking-widest"
+            className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors uppercase font-mono tracking-widest"
             maxLength={10}
           />
         </div>
@@ -109,11 +109,11 @@ export default function JoinPage() {
           <button
             onClick={handleJoin}
             disabled={loading}
-            className="w-full bg-brand text-black font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50"
+            className="w-full bg-brand text-white font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-50"
           >
             {loading ? "Joining..." : "Join Room →"}
           </button>
-          <button onClick={() => router.push("/")} className="w-full text-zinc-500 text-sm py-2 hover:text-white transition-colors">
+          <button onClick={() => router.push("/")} className="w-full text-subtle text-sm py-2 hover:text-main transition-colors">
             ← Back to Home
           </button>
         </div>

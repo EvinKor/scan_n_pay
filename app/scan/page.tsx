@@ -170,7 +170,7 @@ export default function ScanPage() {
       <div className="flex items-center gap-3 mb-1">
         <h1 className="text-2xl font-bold font-mono">Scan Receipt</h1>
       </div>
-      <p className="text-zinc-400 text-sm mb-6">
+      <p className="text-subtle text-sm mb-6">
         Room: <span className="text-brand font-mono">{session?.code}</span>
       </p>
 
@@ -178,12 +178,12 @@ export default function ScanPage() {
       <div
         onClick={() => fileRef.current?.click()}
         className={clsx(
-          "relative rounded-2xl border-2 border-dashed border-muted flex flex-col items-center justify-center p-6 mb-6 cursor-pointer transition-colors hover:border-brand",
+          "relative rounded-2xl border-2 border-dashed border-divider flex flex-col items-center justify-center p-6 mb-6 cursor-pointer transition-colors hover:border-brand",
           preview && "border-brand"
         )}
         style={{ minHeight: 160 }}
       >
-        <div className="absolute top-3 left-3 text-xs text-zinc-400">
+        <div className="absolute top-3 left-3 text-xs text-subtle">
           Tip: place receipt flat, fill the frame, avoid hands or busy backgrounds.
         </div>
         {preview ? (
@@ -192,13 +192,13 @@ export default function ScanPage() {
             {scanning && (
               <>
                 <div className="absolute inset-0 z-10 bg-black/20" />
-                <div className="absolute left-0 w-full h-[2px] bg-brand animate-scan-beam z-20 shadow-[0_0_15px_rgba(0,200,150,0.8)]" />
+                <div className="absolute left-0 w-full h-[2px] bg-brand animate-scan-beam z-20 shadow-[0_0_15px_rgba(138,154,91,0.5)]" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
                   <div className="bg-black/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-brand/30 flex flex-col items-center animate-pulse-glow">
                     <span className="text-brand font-mono font-bold text-sm mb-1">
                       {progress < 30 ? "Analyzing layout..." : progress < 70 ? "Extracting text..." : "Parsing items..."}
                     </span>
-                    <span className="text-white text-xs">{progress}%</span>
+                    <span className="text-main text-xs">{progress}%</span>
                   </div>
                 </div>
               </>
@@ -210,7 +210,7 @@ export default function ScanPage() {
                   e.stopPropagation();
                   fileRef.current?.click();
                 }}
-                className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 mt-2"
+                className="bg-muted border border-divider hover:bg-divider active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 mt-2"
               >
                 🔄 Rescan / Upload New
               </button>
@@ -219,7 +219,7 @@ export default function ScanPage() {
         ) : (
           <>
             <span className="text-4xl mb-2">📷</span>
-            <p className="text-zinc-400 text-sm text-center">
+            <p className="text-subtle text-sm text-center">
               Tap to take photo or upload receipt
             </p>
           </>
@@ -238,7 +238,7 @@ export default function ScanPage() {
       {items.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-sm text-zinc-400 uppercase tracking-wide">
+            <h2 className="font-semibold text-sm text-subtle uppercase tracking-wide">
               Items ({items.length})
             </h2>
             <button onClick={addItem} className="text-brand text-sm font-medium">
@@ -254,17 +254,17 @@ export default function ScanPage() {
                   value={item.name}
                   onChange={(e) => updateItem(item.id, { name: e.target.value })}
                   placeholder="Item name"
-                  className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-zinc-600 min-w-0"
+                  className="flex-1 bg-transparent text-main text-sm focus:outline-none placeholder-divider min-w-0"
                 />
-                <span className="text-zinc-500 text-xs">×</span>
+                <span className="text-subtle text-xs">×</span>
                 <input
                   type="number"
                   value={item.quantity || 1}
                   onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
                   min="1"
-                  className="w-8 bg-transparent text-center text-zinc-300 text-sm font-mono focus:outline-none"
+                  className="w-8 bg-transparent text-center text-main text-sm font-mono focus:outline-none"
                 />
-                <span className="text-zinc-500 text-sm">RM</span>
+                <span className="text-subtle text-sm">RM</span>
                 <input
                   type="number"
                   value={item.price || ""}
@@ -272,9 +272,9 @@ export default function ScanPage() {
                   placeholder="0.00"
                   step="0.10"
                   min="0"
-                  className="w-16 bg-transparent text-right text-white text-sm font-mono focus:outline-none placeholder-zinc-600"
+                  className="w-16 bg-transparent text-right text-main text-sm font-mono focus:outline-none placeholder-divider"
                 />
-                <button onClick={() => removeItem(item.id)} className="text-zinc-600 hover:text-red-400 pl-1 text-lg leading-none">
+                <button onClick={() => removeItem(item.id)} className="text-subtle hover:text-red-400 pl-1 text-lg leading-none">
                   ×
                 </button>
               </div>
@@ -284,7 +284,7 @@ export default function ScanPage() {
           {/* Add item button (bottom) */}
           <button
             onClick={addItem}
-            className="mt-2 w-full border border-dashed border-muted rounded-xl py-2 text-zinc-500 text-sm hover:border-brand hover:text-brand transition-colors"
+            className="mt-2 w-full border border-dashed border-divider rounded-xl py-2 text-subtle text-sm hover:border-brand hover:text-brand transition-colors"
           >
             + Add item
           </button>
@@ -292,9 +292,9 @@ export default function ScanPage() {
           {/* Service Charge & SST Inputs */}
           <div className="bg-surface rounded-xl p-4 mt-4 space-y-3">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-zinc-400 text-sm font-medium">Service Charge</span>
+              <span className="text-subtle text-sm font-medium">Service Charge</span>
               <div className="flex items-center gap-1">
-                <span className="text-zinc-500 text-sm font-mono">RM</span>
+                <span className="text-subtle text-sm font-mono">RM</span>
                 <input
                   type="number"
                   value={serviceCharge || ""}
@@ -302,14 +302,14 @@ export default function ScanPage() {
                   placeholder="0.00"
                   step="0.10"
                   min="0"
-                  className="w-20 bg-zinc-800 rounded-lg px-2 py-1 text-right text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-600"
+                  className="w-20 bg-muted rounded-lg px-2 py-1 text-right text-main text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-divider"
                 />
               </div>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-zinc-400 text-sm font-medium">SST</span>
+              <span className="text-subtle text-sm font-medium">SST</span>
               <div className="flex items-center gap-1">
-                <span className="text-zinc-500 text-sm font-mono">RM</span>
+                <span className="text-subtle text-sm font-mono">RM</span>
                 <input
                   type="number"
                   value={sst || ""}
@@ -317,7 +317,7 @@ export default function ScanPage() {
                   placeholder="0.00"
                   step="0.10"
                   min="0"
-                  className="w-20 bg-zinc-800 rounded-lg px-2 py-1 text-right text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-zinc-600"
+                  className="w-20 bg-muted rounded-lg px-2 py-1 text-right text-main text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand placeholder-divider"
                 />
               </div>
             </div>
@@ -328,7 +328,7 @@ export default function ScanPage() {
       {items.length === 0 && !scanning && (
         <button
           onClick={addItem}
-          className="w-full border border-dashed border-muted rounded-xl py-4 text-zinc-500 text-sm hover:border-brand hover:text-brand transition-colors mb-6"
+          className="w-full border border-dashed border-divider rounded-xl py-4 text-subtle text-sm hover:border-brand hover:text-brand transition-colors mb-6"
         >
           + Add items manually
         </button>
@@ -338,14 +338,14 @@ export default function ScanPage() {
       {items.length > 0 && (
         <div className="bg-surface rounded-xl px-4 py-3 mb-6 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-zinc-400 text-sm">Items Total</span>
-            <span className="text-white font-mono font-semibold text-lg">
+            <span className="text-subtle text-sm">Items Total</span>
+            <span className="text-main font-mono font-semibold text-lg">
               RM {total.toFixed(2)}
             </span>
           </div>
           {receiptTotal > 0 && (
-            <div className="flex justify-between items-center border-t border-muted pt-2">
-              <span className="text-zinc-500 text-xs">Receipt Total</span>
+            <div className="flex justify-between items-center border-t border-divider pt-2">
+              <span className="text-subtle text-xs">Receipt Total</span>
               <span className={clsx(
                 "font-mono text-xs",
                 Math.abs(total - receiptTotal) < 0.05 ? "text-brand" : "text-yellow-400"
@@ -361,7 +361,7 @@ export default function ScanPage() {
       {/* Who Paid */}
       {session && (
         <div className="mb-6 space-y-3">
-          <h2 className="font-semibold text-sm text-zinc-400 uppercase tracking-wide">
+          <h2 className="font-semibold text-sm text-subtle uppercase tracking-wide">
             Who paid the bill?
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -372,8 +372,8 @@ export default function ScanPage() {
                 className={clsx(
                   "px-4 py-2 rounded-xl text-sm font-medium transition-all",
                   paidBy === p.name
-                    ? "bg-brand text-black"
-                    : "bg-muted text-zinc-300 hover:bg-zinc-700"
+                    ? "bg-brand text-white"
+                    : "bg-muted text-main hover:bg-divider"
                 )}
               >
                 {p.name}
@@ -394,7 +394,7 @@ export default function ScanPage() {
           onClick={handleShare}
         >
           <div>
-            <p className="text-zinc-400 text-xs">Share invite link — tap to share</p>
+            <p className="text-subtle text-xs">Share invite link — tap to share</p>
             <p className="text-brand font-mono font-semibold tracking-widest">{session.code}</p>
           </div>
           <span className="text-xl">
@@ -408,7 +408,7 @@ export default function ScanPage() {
         <button
           onClick={handleNext}
           disabled={scanning}
-          className="w-full max-w-lg mx-auto block bg-brand text-black font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-40"
+          className="w-full max-w-lg mx-auto block bg-brand text-white font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all disabled:opacity-40"
         >
           Continue to Split →
         </button>

@@ -23,7 +23,6 @@ export const metadata: Metadata = {
   },
 };
 
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -32,7 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body suppressHydrationWarning>
-
         {children}
       </body>
     </html>

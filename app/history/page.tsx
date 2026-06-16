@@ -66,24 +66,27 @@ export default function HistoryPage() {
       if (!merged.find(m => m.id === ld.id)) merged.push(ld);
     });
 
+    // Filter out unscanned sessions (status === "scanning")
+    const filtered = merged.filter(m => m.data && m.data.status !== "scanning");
+
     // Sort descending by created_at
-    merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    setHistory(merged);
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setHistory(filtered);
     setLoading(false);
   }
 
   return (
-    <main className="min-h-screen bg-[#0f0f0f] text-zinc-300 pb-20">
+    <main className="min-h-screen bg-background text-main pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0f0f0f]/90 backdrop-blur-md border-b border-zinc-800">
+      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-divider">
         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
           <button 
             onClick={() => router.back()}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-800 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
           >
             <span className="text-xl">←</span>
           </button>
-          <h1 className="text-white font-bold text-lg font-mono tracking-tight">Past Receipts</h1>
+          <h1 className="text-main font-bold text-lg font-mono tracking-tight">Past Receipts</h1>
           <div className="w-10" />
         </div>
       </div>
@@ -92,12 +95,12 @@ export default function HistoryPage() {
         {loading ? (
           <div className="text-center py-10">
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-zinc-500 text-sm">Loading history...</p>
+            <p className="text-subtle text-sm">Loading history...</p>
           </div>
         ) : history.length === 0 ? (
-          <div className="text-center py-12 bg-surface border border-zinc-800 rounded-2xl">
+          <div className="text-center py-12 bg-surface/80 backdrop-blur-md border border-divider rounded-2xl">
             <span className="text-4xl mb-4 block">👻</span>
-            <p className="text-zinc-400">No past receipts found.</p>
+            <p className="text-subtle">No past receipts found.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -116,7 +119,7 @@ export default function HistoryPage() {
                     "relative overflow-hidden w-full border rounded-xl p-4 text-left transition-all block group",
                     h.data?.status === "done"
                       ? "bg-[#015ABF]/10 border-[#015ABF]/30 hover:bg-[#015ABF]/20"
-                      : "bg-surface border-zinc-700 hover:border-brand/50 hover:bg-brand/5"
+                      : "bg-surface/80 backdrop-blur-md border-divider hover:border-brand/50 hover:bg-brand/5"
                   )}
                 >
                   {h.data?.status === "done" && (
@@ -128,11 +131,11 @@ export default function HistoryPage() {
                   )}
                   <div className="flex justify-between items-start mb-3">
                     <div className="relative z-20">
-                      <p className="text-white font-mono font-bold text-lg flex items-center gap-2">
+                      <p className="text-main font-mono font-bold text-lg flex items-center gap-2">
                         <span>🧾</span>
                         {h.data?.name || h.code}
                       </p>
-                      <p className="text-zinc-500 text-xs mt-0.5">
+                      <p className="text-subtle text-xs mt-0.5">
                         {new Date(h.created_at).toLocaleDateString(undefined, {
                           year: 'numeric', month: 'short', day: 'numeric',
                           hour: '2-digit', minute: '2-digit'
@@ -140,17 +143,17 @@ export default function HistoryPage() {
                       </p>
                     </div>
                     <div className="text-right mt-1">
-                      <p className="text-white font-mono font-bold text-xl leading-none mt-2 whitespace-nowrap">
+                      <p className="text-main font-mono font-bold text-xl leading-none mt-2 whitespace-nowrap">
                         RM {grandTotal.toFixed(2)}
                       </p>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider mt-1.5 whitespace-nowrap">Total Bill</p>
+                      <p className="text-subtle text-[10px] uppercase tracking-wider mt-1.5 whitespace-nowrap">Total Bill</p>
                     </div>
                   </div>
                   
                   {/* Participants section */}
-                  <div className="bg-[#121214] rounded-lg p-2.5 border border-zinc-800/50">
-                    <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-1">Owner: {h.data?.owner || "Unknown"}</p>
-                    <p className="text-zinc-300 text-xs line-clamp-2 leading-relaxed">
+                  <div className="bg-background rounded-lg p-2.5 border border-divider/50">
+                    <p className="text-subtle text-[10px] uppercase tracking-widest font-bold mb-1">Owner: {h.data?.owner || "Unknown"}</p>
+                    <p className="text-main text-xs line-clamp-2 leading-relaxed">
                       👥 {participantsList || "Unknown"}
                     </p>
                   </div>
