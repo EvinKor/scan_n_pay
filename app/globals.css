@@ -41,8 +41,15 @@ html, body {
 
   /* Receipt Theme Background */
   .receipt-bg {
-    background-color: rgb(var(--surface)); /* dark paper */
-    color: rgb(var(--main));
+    background-color: #fdfdf9; /* off-white paper */
+    color: #1a1a1a;
+    
+    /* Override Tailwind CSS variables for the receipt to enforce a light theme */
+    --surface: 253 253 249; /* #fdfdf9 */
+    --main: 26 26 26;       /* #1a1a1a */
+    --muted: 243 244 246;   /* gray-100 */
+    --subtle: 107 114 128;  /* gray-500 */
+    --divider: 209 213 219; /* gray-300 */
   }
 
   .receipt-edge-top {

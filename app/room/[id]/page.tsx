@@ -162,7 +162,7 @@ export default function RoomPage() {
       if (item.id !== itemId) return item;
       const assignments = { ...getAssignments(item) };
       const currentClaim = assignments[targetName] || 0;
-      
+
       const totalQty = item.quantity || 1;
       const totalClaimedOthers = Object.entries(assignments)
         .filter(([name]) => name !== targetName)
@@ -477,7 +477,7 @@ export default function RoomPage() {
   const receiptItemsTotal = session.items.filter(i => !i.addedLater).reduce((s, i) => s + (Number(i.price) || 0), 0);
   const addedItemsTotal = session.items.filter(i => i.addedLater).reduce((s, i) => s + (Number(i.price) || 0), 0);
   const itemsSubtotal = receiptItemsTotal + addedItemsTotal;
-  const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0);
+  const grandTotal = itemsSubtotal + (session.serviceCharge || 0) + (session.sst || 0) + (session.rounding || 0);
   const isLocked = session.status === "paying" || session.status === "done";
 
   let unclaimedAmount = 0;
@@ -502,7 +502,7 @@ export default function RoomPage() {
 
     if (unclaimedSubtotal > 0 && totalSubtotal > 0) {
       const ratioUnclaimed = unclaimedSubtotal / totalSubtotal;
-      unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed;
+      unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed + (session.rounding || 0) * ratioUnclaimed;
     }
   }
 
@@ -723,19 +723,19 @@ export default function RoomPage() {
       {/* Header */}
       <div className="px-4 pt-8 pb-4">
         <div className="flex items-center mb-4">
-          <button 
+          <button
             onClick={() => router.push("/")}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors mr-3 flex-shrink-0"
+            className="flex items-center gap-1 text-subtle hover:text-main font-medium transition-colors text-sm px-2 py-1.5 -ml-2 mr-2 flex-shrink-0"
           >
-            ←
+            ← Back
           </button>
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full text-xs text-brand font-medium">
-            👤 Paying as <span className="font-bold">{myName}</span>
+            Paying as<span className="font-bold">{myName}</span>
           </div>
           <div className="flex-1" />
           <div className="flex gap-2">
             <span className="text-xs bg-muted text-subtle px-3 py-1.5 rounded-full flex items-center">
-              👥 {session.participants.length}
+              {session.participants.length} Participants
             </span>
             {session.status !== "done" && (
               <button
@@ -761,7 +761,7 @@ export default function RoomPage() {
               onClick={() => router.push(`/scan?session=${session.id}`)}
               className="bg-brand/10 text-brand border border-brand/20 hover:bg-brand/20 active:scale-95 px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-sm"
             >
-              🔄 Rescan / Edit
+              Rescan / Edit
             </button>
           )}
         </div>
@@ -1023,7 +1023,7 @@ export default function RoomPage() {
                     <span className="font-mono">RM {addedItemsTotal.toFixed(2)}</span>
                   </div>
                 )}
-                {(addedItemsTotal > 0 || session.serviceCharge > 0 || session.sst > 0) && (
+                {(addedItemsTotal > 0 || session.serviceCharge > 0 || session.sst > 0 || session.rounding !== 0) && (
                   <div className="flex justify-between text-subtle text-xs pt-1 border-t border-divider/30 mt-1">
                     <span>Subtotal</span>
                     <span className="font-mono">RM {itemsSubtotal.toFixed(2)}</span>
@@ -1039,6 +1039,12 @@ export default function RoomPage() {
                   <div className="flex justify-between text-subtle text-xs">
                     <span>SST</span>
                     <span className="font-mono">RM {session.sst.toFixed(2)}</span>
+                  </div>
+                )}
+                {session.rounding !== undefined && session.rounding !== 0 && (
+                  <div className="flex justify-between text-subtle text-xs">
+                    <span>Rounding</span>
+                    <span className="font-mono">{session.rounding < 0 ? "-RM " + Math.abs(session.rounding).toFixed(2) : "RM " + session.rounding.toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -1298,23 +1304,29 @@ export default function RoomPage() {
                                     </div>
                                   )}
 
-                                  {/* Service charge and SST proportional breakdown */}
-                                  {(session.serviceCharge > 0 || session.sst > 0) && (
-                                    <div className="border-t border-divider/30 pt-1 mt-1 space-y-0.5">
-                                      <div className="flex justify-between text-[10px] text-subtle">
-                                        <span>Subtotal</span>
-                                        <span className="font-mono">RM {personSubtotal.toFixed(2)}</span>
-                                      </div>
+                        {/* Service charge and SST proportional breakdown */}
+                                  {(session.serviceCharge > 0 || session.sst > 0 || session.rounding !== 0) && (
+                                    <div className="mt-1 pt-1 border-t border-divider/30 flex flex-col gap-0.5 text-[10px] text-subtle">
                                       {session.serviceCharge > 0 && (
-                                        <div className="flex justify-between text-[10px] text-subtle">
+                                        <div className="flex justify-between">
                                           <span>Service Charge</span>
                                           <span className="font-mono">RM {personServiceCharge.toFixed(2)}</span>
                                         </div>
                                       )}
                                       {session.sst > 0 && (
-                                        <div className="flex justify-between text-[10px] text-subtle">
+                                        <div className="flex justify-between">
                                           <span>SST</span>
                                           <span className="font-mono">RM {personSst.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      {session.rounding !== undefined && session.rounding !== 0 && (
+                                        <div className="flex justify-between">
+                                          <span>Rounding</span>
+                                          <span className="font-mono">
+                                            {session.rounding < 0 
+                                              ? "-RM " + Math.abs((session.rounding || 0) * ratio).toFixed(2) 
+                                              : "RM " + ((session.rounding || 0) * ratio).toFixed(2)}
+                                          </span>
                                         </div>
                                       )}
                                     </div>
@@ -1494,33 +1506,42 @@ export default function RoomPage() {
                     <p className="text-xs text-subtle uppercase tracking-wide mb-2">Your items</p>
                     <div className="space-y-1.5">
                       {renderItemList(s.items)}
-                      {/* Service charge and SST */}
+                      {/* Tax / Service / Rounding */}
                       {(() => {
                         const mySubtotal = s.items.reduce((sum, item) => {
                           return sum + (s.splitMode === "byItem"
                             ? getItemShare(item, myName, s.participants.length, isLocked, s.paidBy)
                             : (Number(item.price) || 0) / s.participants.length);
                         }, 0);
-                        const totalSubtotal = s.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-                        const ratio = totalSubtotal > 0 ? mySubtotal / totalSubtotal : 1 / s.participants.length;
+                        const itemsSubtotal = s.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+                        const ratio = itemsSubtotal > 0 ? (s.splitMode === "equal" ? myTotal / (itemsSubtotal / s.participants.length) : myTotal / itemsSubtotal) : 0;
                         const myServiceCharge = (s.serviceCharge || 0) * ratio;
                         const mySst = (s.sst || 0) * ratio;
-                        return (s.serviceCharge > 0 || s.sst > 0) ? (
-                          <div className="border-t border-divider/50 pt-2 mt-2 space-y-1">
+                        const myRounding = (s.rounding || 0) * ratio;
+                        return (s.serviceCharge > 0 || s.sst > 0 || s.rounding !== 0) ? (
+                          <div className="pt-2 mt-2 border-t border-divider/30 space-y-1">
                             <div className="flex justify-between text-xs text-subtle">
                               <span>Subtotal</span>
                               <span className="font-mono">RM {mySubtotal.toFixed(2)}</span>
                             </div>
                             {s.serviceCharge > 0 && (
-                              <div className="flex justify-between text-xs text-subtle">
+                              <div className="flex justify-between text-subtle text-xs">
                                 <span>Service Charge</span>
                                 <span className="font-mono">RM {myServiceCharge.toFixed(2)}</span>
                               </div>
                             )}
                             {s.sst > 0 && (
-                              <div className="flex justify-between text-xs text-subtle">
+                              <div className="flex justify-between text-subtle text-xs">
                                 <span>SST</span>
                                 <span className="font-mono">RM {mySst.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {s.rounding !== undefined && s.rounding !== 0 && (
+                              <div className="flex justify-between text-subtle text-xs">
+                                <span>Rounding</span>
+                                <span className="font-mono">
+                                  {myRounding < 0 ? "-RM " + Math.abs(myRounding).toFixed(2) : "RM " + myRounding.toFixed(2)}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -1704,7 +1725,7 @@ export default function RoomPage() {
 
       {/* Floating CTA — Split tab only */}
       {tab === "split" && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-dark to-transparent pointer-events-none">
+        <div className="sticky bottom-6 mt-8 flex justify-center z-20 pointer-events-none">
           <button
             onClick={() => {
               if (grandTotal <= 0) {
@@ -1713,7 +1734,7 @@ export default function RoomPage() {
               }
               setTab("pay");
             }}
-            className="pointer-events-auto w-full max-w-xs mx-auto block bg-brand text-white font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)]"
+            className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-brand/20"
           >
             Go to Payment →
           </button>

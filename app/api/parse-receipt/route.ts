@@ -36,6 +36,7 @@ Return ONLY a valid JSON object with this exact structure:
   ],
   "serviceCharge": 0,
   "sst": 0,
+  "rounding": 0,
   "receiptTotal": 0
 }
 
@@ -46,8 +47,9 @@ Rules:
 - Skip items with price 0.00 or free items
 - "serviceCharge": the service charge amount (if any)
 - "sst": SST / government tax amount (if any)  
+- "rounding": rounding adjustment amount (e.g. 0.02 or -0.02) if explicitly shown
 - "receiptTotal": the final total amount on the receipt
-- Do NOT include service charge or SST in the items array
+- Do NOT include service charge, SST, or rounding in the items array
 - Return ONLY the JSON, no markdown, no explanation`;
 
   try {
@@ -132,6 +134,7 @@ Rules:
       items,
       serviceCharge: Number(parsed.serviceCharge) || 0,
       sst: Number(parsed.sst) || 0,
+      rounding: Number(parsed.rounding) || 0,
       receiptTotal: Number(parsed.receiptTotal) || 0,
     });
   } catch (err: any) {

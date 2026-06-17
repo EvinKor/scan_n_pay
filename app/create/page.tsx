@@ -97,11 +97,15 @@ export default function CreatePage() {
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12 max-w-sm mx-auto">
       <div className="w-full space-y-6">
         {step === 1 && (
-          <>
+          <div className="relative pt-12 w-full">
+            <button 
+              onClick={() => router.push("/")} 
+              className="absolute top-0 left-0 flex items-center gap-1 text-subtle hover:text-main font-medium transition-colors px-3 py-1.5 rounded-lg text-sm"
+            >
+              ← Back
+            </button>
             <div className="text-center mb-8">
-              <div className="w-full max-w-[240px] mx-auto mb-4">
-          <img src="/app_icon.png" alt="Split Lah Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
-        </div>
+              <h1 className="text-2xl font-bold text-main mb-1">New Room</h1>
               <p className="text-subtle mt-1 text-sm">Create a room to scan and split</p>
             </div>
 
@@ -180,11 +184,8 @@ export default function CreatePage() {
               >
                 Choose Split Method →
               </button>
-              <button onClick={() => router.push("/")} className="w-full text-subtle text-sm py-2 hover:text-main transition-colors">
-                ← Back to Home
-              </button>
             </div>
-          </>
+          </div>
         )}
 
         {step === 2 && (
@@ -192,7 +193,7 @@ export default function CreatePage() {
             <button 
               onClick={() => setStep(1)} 
               disabled={loading}
-              className="absolute top-0 left-0 flex items-center gap-1 text-subtle hover:text-main font-medium transition-colors disabled:opacity-50 bg-surface/80 backdrop-blur-md border border-divider px-3 py-1.5 rounded-lg"
+              className="absolute top-0 left-0 flex items-center gap-1 text-subtle hover:text-main font-medium transition-colors disabled:opacity-50 px-3 py-1.5 rounded-lg"
             >
               ← Back
             </button>
