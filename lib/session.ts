@@ -39,6 +39,7 @@ export interface Session {
   totals: Record<string, number>; // name → amount owed
   serviceCharge: number;
   sst: number;
+  rounding?: number;
   receiptTotal: number;
 }
 
@@ -72,6 +73,7 @@ export async function createSession(
     totals: {},
     serviceCharge: 0,
     sst: 0,
+    rounding: 0,
     receiptTotal: 0,
   };
 

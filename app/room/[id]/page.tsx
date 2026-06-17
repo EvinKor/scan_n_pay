@@ -1514,7 +1514,7 @@ export default function RoomPage() {
                             : (Number(item.price) || 0) / s.participants.length);
                         }, 0);
                         const itemsSubtotal = s.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-                        const ratio = itemsSubtotal > 0 ? (s.splitMode === "equal" ? myTotal / (itemsSubtotal / s.participants.length) : myTotal / itemsSubtotal) : 0;
+                        const ratio = itemsSubtotal > 0 ? (s.splitMode === "even" ? myTotal / (itemsSubtotal / s.participants.length) : myTotal / itemsSubtotal) : 0;
                         const myServiceCharge = (s.serviceCharge || 0) * ratio;
                         const mySst = (s.sst || 0) * ratio;
                         const myRounding = (s.rounding || 0) * ratio;

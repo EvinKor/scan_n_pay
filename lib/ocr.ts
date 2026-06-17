@@ -7,6 +7,7 @@ export interface ReceiptResult {
   items: LineItem[];
   serviceCharge: number;
   sst: number;
+  rounding?: number;
   receiptTotal: number;
   computedTotal?: number;
   discrepancy?: number;
@@ -63,6 +64,7 @@ export async function extractReceiptItems(
           items,
           serviceCharge: data.serviceCharge || 0,
           sst: data.sst || 0,
+          rounding: data.rounding || 0,
           receiptTotal: data.receiptTotal || 0,
         };
       } else {
@@ -295,6 +297,7 @@ function parseReceiptText(text: string): ReceiptResult {
   const items: LineItem[] = [];
   let serviceCharge = 0;
   let sst = 0;
+  let rounding = 0;
   let receiptTotal = 0;
   let lastUnpricedLine = "";
 
@@ -410,8 +413,9 @@ function parseReceiptText(text: string): ReceiptResult {
       continue;
     }
 
-    // Check for rounding adjustment — skip
+    // Check for rounding adjustment
     if (roundingPattern.test(textToClassify)) {
+      rounding = /-\s*RM/i.test(line) ? -price : price;
       continue;
     }
 
@@ -451,7 +455,7 @@ function parseReceiptText(text: string): ReceiptResult {
   const discrepancy = receiptTotal ? +(receiptTotal - computedTotal).toFixed(2) : 0;
   const totalMatches = receiptTotal ? Math.abs(discrepancy) < 0.10 : true;
 
-  return { items, serviceCharge, sst, receiptTotal, computedTotal, discrepancy, totalMatches };
+  return { items, serviceCharge, sst, rounding, receiptTotal, computedTotal, discrepancy, totalMatches };
 }
 
 /**
