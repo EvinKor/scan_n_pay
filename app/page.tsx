@@ -191,7 +191,9 @@ export default function Home() {
           </div>
         ) : mode === "idle" ? (
           <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-xl p-6 text-center space-y-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
-            <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-3xl mx-auto mb-2">👋</div>
+            <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-brand mx-auto mb-2">
+              <svg xmlns="http://www.w3.org/0000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+            </div>
             <h2 className="text-main font-bold text-lg">Welcome to SplitLah</h2>
             <p className="text-subtle text-sm">Log in to save your split history, or continue as a guest.</p>
 
