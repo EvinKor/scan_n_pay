@@ -1,11 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#00c896",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: "SplitLah — Receipt Splitter",
   description: "Scan receipts, split bills, pay via TNG",
   manifest: "/manifest.json",
-  themeColor: "#00c896",
   icons: {
     icon: "/app_icon.png",
     apple: "/app_icon.png",
@@ -14,12 +21,6 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "SplitLah",
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
   },
 };
 
