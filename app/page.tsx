@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createSession, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom, getLocalUser, getLocalHistory } from "@/lib/identity";
 import { supabase } from "@/lib/supabase";
-import { getAnimalIcon } from "@/lib/animals";
+import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 
 export default function Home() {
@@ -174,11 +174,9 @@ export default function Home() {
         )}
 
         {user ? (
-          <div className="bg-surface/80 backdrop-blur-md border border-brand/30 rounded-xl p-4 flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center text-xl">
-              {icon || getAnimalIcon(name || user.email)}
-            </div>
-            <div className="text-center">
+          <div className="bg-surface/80 backdrop-blur-md border border-brand/30 rounded-xl p-4 flex items-center gap-4">
+            <AnimalAvatar name={name || user.email} customIcon={icon} className="w-16 h-16 text-xl" />
+            <div className="text-left">
               <p className="text-main font-semibold">Welcome back!</p>
               <p className="text-brand font-mono">{name || user.email}</p>
             </div>

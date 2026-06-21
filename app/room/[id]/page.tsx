@@ -13,7 +13,7 @@ import {
   getItemShare,
 } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom, addRoomToLocalHistory } from "@/lib/identity";
-import { getAnimalIcon } from "@/lib/animals";
+import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -875,7 +875,7 @@ export default function RoomPage() {
                       isOwner && session.status !== "done" && p.name !== myName ? "hover:ring-2 hover:ring-brand/50 cursor-pointer" : "cursor-default"
                     )}
                   >
-                    <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
+                    <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-1.5 w-6 h-6" />{p.name}
                     {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
                     {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
                     {isOwner && session.status !== "done" && p.name !== myName && (
@@ -992,8 +992,8 @@ export default function RoomPage() {
 
               return (
                 <div key={p.name} className="flex justify-between items-center">
-                  <span className={clsx("text-sm", p.name === myName && "text-brand font-medium")}>
-                    <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name === myName ? `${p.name} (you)` : p.name}
+                  <span className={clsx("flex items-center text-sm", p.name === myName && "text-brand font-medium")}>
+                    <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-1.5 w-6 h-6" />{p.name === myName ? `${p.name} (you)` : p.name}
                   </span>
                   <span className="font-mono text-sm text-main">
                     RM {displayTotal.toFixed(2)}
@@ -1177,8 +1177,8 @@ export default function RoomPage() {
                                         isFullyPaid ? "bg-brand" : hasUnpaidBalance ? "bg-yellow-400" : "bg-divider"
                                       )}
                                     />
-                                    <span className="text-sm text-main font-medium">
-                                      <span className="mr-1.5 text-lg">{p.icon || getAnimalIcon(p.name)}</span>{p.name}
+                                    <span className="text-sm text-main font-medium flex items-center">
+                                      <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-1.5 w-6 h-6" />{p.name}
                                     </span>
                                     {isFullyPaid && (
                                       <span className="text-brand text-xs flex items-center gap-1">
@@ -1802,7 +1802,7 @@ export default function RoomPage() {
           <div className="p-4 bg-surface/80 backdrop-blur-md border-b border-divider flex items-center justify-between pt-8 pb-4">
             <div>
               <p className="text-subtle text-xs uppercase tracking-widest">Selecting items for</p>
-              <p className="text-main font-bold text-lg flex items-center gap-2"><span className="text-2xl">{session.participants.find(p => p.name === selectForFriend)?.icon || getAnimalIcon(selectForFriend)}</span> {selectForFriend}</p>
+              <p className="text-main font-bold text-lg flex items-center gap-2"><AnimalAvatar name={selectForFriend} customIcon={session.participants.find(p => p.name === selectForFriend)?.icon} className="w-8 h-8" /> {selectForFriend}</p>
             </div>
             <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
           </div>

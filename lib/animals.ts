@@ -14,3 +14,12 @@ export function getAnimalIcon(name: string): string {
   const index = Math.abs(hash) % ANIMAL_ICONS.length;
   return ANIMAL_ICONS[index];
 }
+
+export function getAnimalIconIndex(name: string): number {
+  if (!name) return 0;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 20;
+}

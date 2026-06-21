@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getLocalUser, setLocalUser } from "@/lib/identity";
 import InstallPWA from "@/components/InstallPWA";
+import { AnimalAvatar } from "@/components/AnimalAvatar";
 
-const EMOJIS = ["🦁", "🐯", "🐻", "🐸", "🐷", "🐵", "🦊", "🐶", "🐱", "🐰", "🐼", "🐨", "🐔", "🐧", "🦉", "🦄", "🐉", "🦖", "🐙", "🐬"];
+const ANIMAL_INDICES = Array.from({ length: 20 }, (_, i) => i.toString());
 
 export default function SettingPage() {
   const router = useRouter();
@@ -155,26 +156,24 @@ export default function SettingPage() {
                 <div className="grid grid-cols-5 gap-2">
                   <button
                     onClick={() => setIcon("")}
-                    className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${!icon ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted text-subtle hover:bg-divider"}`}
+                    className={`col-span-5 h-16 flex items-center justify-center rounded-xl text-xs font-bold transition-all ${!icon ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted text-subtle hover:bg-divider"}`}
                   >
-                    🎲
+                    Auto Assigned Avatar
                   </button>
-                  {EMOJIS.map(e => (
+                  {ANIMAL_INDICES.map(i => (
                     <button
-                      key={e}
-                      onClick={() => setIcon(e)}
-                      className={`h-12 flex items-center justify-center rounded-xl text-lg transition-all ${icon === e ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted text-subtle hover:bg-divider"}`}
+                      key={i}
+                      onClick={() => setIcon(i)}
+                      className={`h-16 flex items-center justify-center rounded-xl transition-all overflow-hidden ${icon === i ? "ring-2 ring-brand ring-offset-2 ring-offset-background" : "bg-surface border border-divider/50 hover:bg-muted"}`}
                     >
-                      {e}
+                      <AnimalAvatar name="" customIcon={i} className="w-12 h-12 drop-shadow-sm scale-125" />
                     </button>
                   ))}
                 </div>
                 <p className="text-subtle text-[10px] mt-2">
-                  {!icon ? "🎲 Random animal icon (default)" : `Selected: ${icon}`}
+                  {!icon ? "Auto-assigned based on your name" : "Custom animal selected"}
                 </p>
               </div>
-
-
 
               <div>
                 <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">
@@ -219,7 +218,7 @@ export default function SettingPage() {
           <section className="space-y-3">
             <h2 className="text-subtle text-xs uppercase tracking-wide px-2">History</h2>
             <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-2">
-              <button
+               <button
                 onClick={() => router.push("/history")}
                 className="w-full bg-transparent hover:bg-muted text-main font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
               >

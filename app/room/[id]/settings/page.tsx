@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSession, updateSession, subscribeToSession, deleteSession, Session } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom } from "@/lib/identity";
-import { getAnimalIcon } from "@/lib/animals";
+import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 
 export default function RoomSettingsPage() {
@@ -145,7 +145,7 @@ export default function RoomSettingsPage() {
             {session.participants.map(p => (
               <div key={p.name} className="flex items-center justify-between p-3">
                 <span className="text-main text-sm flex items-center gap-2">
-                  <span className="text-xl">{p.icon || getAnimalIcon(p.name)}</span> {p.name} {p.name === myName && <span className="text-subtle text-xs">(you)</span>}
+                  <AnimalAvatar name={p.name} customIcon={p.icon} className="w-8 h-8" /> {p.name} {p.name === myName && <span className="text-subtle text-xs">(you)</span>}
                 </span>
                 {p.name !== myName && (
                   <button

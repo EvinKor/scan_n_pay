@@ -65,9 +65,6 @@ export default function JoinPage() {
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12 max-w-sm mx-auto">
       <div className="w-full space-y-6">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface/80 backdrop-blur-md border border-divider mb-4">
-            <span className="text-3xl">🤝</span>
-          </div>
           <h1 className="text-3xl font-bold font-mono text-main tracking-tight">Join Room</h1>
           <p className="text-subtle mt-1 text-sm">Enter a code to join your friends</p>
         </div>
