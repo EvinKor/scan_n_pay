@@ -46,7 +46,8 @@ export default function Home() {
     const installHandler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowInstallDialog(true);
+      // Only show install dialog when they click the logo now
+      // setShowInstallDialog(true);
     };
     window.addEventListener('beforeinstallprompt', installHandler);
 
@@ -130,14 +131,21 @@ export default function Home() {
           <img 
             src="/app_icon.png" 
             alt="Split Lah Logo" 
-            className="w-full h-auto drop-shadow-md rounded-xl cursor-pointer active:scale-95 transition-transform" 
+            className="w-full h-auto drop-shadow-md rounded-xl cursor-pointer active:scale-95 transition-transform relative z-10" 
             onClick={handleLogoClick} 
           />
           
-          {/* Install Speech Bubble (Side) */}
+          {/* Click me Indicator */}
+          {deferredPrompt && !showInstallDialog && (
+            <div className="absolute -top-2 -right-2 bg-surface/90 backdrop-blur-sm border border-divider text-subtle text-[10px] font-medium px-2.5 py-1 rounded-full shadow-sm rotate-[8deg] animate-pulse pointer-events-none z-20 whitespace-nowrap">
+              Click me
+            </div>
+          )}
+          
+          {/* Install Speech Bubble (Responsive Toast) */}
           {showInstallDialog && (
             <div 
-              className="absolute top-1/2 left-[110%] -translate-y-1/2 w-[220px] bg-surface/80 backdrop-blur-xl border border-divider p-4 rounded-2xl shadow-[0_10px_40px_rgb(0,0,0,0.5)] z-50 animate-in fade-in slide-in-from-left-4 duration-300 text-left"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 md:absolute md:bottom-auto md:top-1/2 md:left-[110%] md:-translate-x-0 md:-translate-y-1/2 w-[90vw] md:w-[220px] bg-surface/90 backdrop-blur-xl border border-divider p-4 rounded-2xl shadow-[0_10px_40px_rgb(0,0,0,0.5)] z-[100] animate-in fade-in slide-in-from-bottom-4 md:slide-in-from-left-4 duration-300 text-left"
               onClick={e => e.stopPropagation()}
             >
               <button 
@@ -154,8 +162,8 @@ export default function Home() {
               >
                 Install App
               </button>
-              {/* Triangle pointer to the left */}
-              <div className="absolute top-1/2 -left-2 -translate-y-1/2 w-4 h-4 bg-surface/80 backdrop-blur-md border-b border-l border-divider rotate-45" />
+              {/* Pointer (Only on desktop) */}
+              <div className="hidden md:block absolute top-1/2 -left-2 -translate-y-1/2 w-4 h-4 bg-surface/90 backdrop-blur-md border-b border-l border-divider rotate-45" />
             </div>
           )}
         </div>

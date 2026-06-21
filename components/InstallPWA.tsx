@@ -44,7 +44,7 @@ export default function InstallPWA() {
     if ('serviceWorker' in navigator) {
       try {
         const reg = await navigator.serviceWorker.ready;
-        await reg.update();
+        reg.update().catch(console.error);
         
         let reloaded = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -76,7 +76,8 @@ export default function InstallPWA() {
         disabled={isUpdating}
         className="w-full bg-brand/10 text-brand font-semibold rounded-xl py-3 border border-brand/20 hover:bg-brand/20 transition-all flex items-center justify-center gap-2"
       >
-        {isUpdating ? "🔄 Updating..." : "🔄 Check for Updates"}
+        <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isUpdating ? "animate-spin" : ""}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+        {isUpdating ? "Updating..." : "Check for Updates"}
       </button>
     );
   }
@@ -86,7 +87,8 @@ export default function InstallPWA() {
       onClick={handleInstall}
       className="w-full bg-brand/10 text-brand font-semibold rounded-xl py-3 border border-brand/20 hover:bg-brand/20 transition-all flex items-center justify-center gap-2"
     >
-      📱 Add to Home Screen
+      <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+      Add to Home Screen
     </button>
   );
 }

@@ -78,7 +78,7 @@ export default function HistoryPage() {
   return (
     <main className="min-h-screen bg-background text-main pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-divider">
+      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-divider pt-[env(safe-area-inset-top)]">
         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
           <button 
             onClick={() => router.back()}
