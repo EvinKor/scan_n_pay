@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// ── Security: Allowed origins ──
+const ALLOWED_ORIGINS = [
+  "https://scan-n-pay.vercel.app",
+  "http://localhost:3000",
+];
+
+// ── Security: Simple in-memory rate limiter ──
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const MAX_REQUESTS = 10; // per window
+const WINDOW_MS = 60_000; // 1 minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_REQUESTS;
+}
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // ~10MB base64 string
+
 /**
  * POST /api/vision
  *
@@ -9,11 +33,28 @@ import { NextRequest, NextResponse } from "next/server";
  * then merges lines from different blocks that share the same Y position.
  */
 export async function POST(req: NextRequest) {
+  // ── Origin check ──
+  const origin = req.headers.get("origin") || "";
+  if (process.env.NODE_ENV === "production" && !ALLOWED_ORIGINS.includes(origin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // ── Rate limit ──
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
+  }
+
   const body = await req.json();
   const imageBase64 = body?.imageBase64;
 
   if (!imageBase64 || typeof imageBase64 !== "string") {
     return NextResponse.json({ error: "Missing imageBase64" }, { status: 400 });
+  }
+
+  // ── Image size check ──
+  if (imageBase64.length > MAX_IMAGE_SIZE) {
+    return NextResponse.json({ error: "Image too large" }, { status: 413 });
   }
 
   const apiKey = process.env.GOOGLE_CLOUD_VISION_KEY;
