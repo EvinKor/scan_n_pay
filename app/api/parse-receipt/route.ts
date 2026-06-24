@@ -96,7 +96,10 @@ Rules:
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Referer": "https://scan-n-pay.vercel.app/"
+      },
       body: JSON.stringify({
         contents: [
           {
