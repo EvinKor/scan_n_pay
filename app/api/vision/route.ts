@@ -35,7 +35,12 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // ~10MB base64 string
 export async function POST(req: NextRequest) {
   // ── Origin check ──
   const origin = req.headers.get("origin") || "";
-  if (process.env.NODE_ENV === "production" && !ALLOWED_ORIGINS.includes(origin)) {
+  const isAllowedOrigin = 
+    origin === "https://scan-n-pay.vercel.app" || 
+    origin.endsWith(".vercel.app") || 
+    origin.startsWith("http://localhost:");
+
+  if (process.env.NODE_ENV === "production" && !isAllowedOrigin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -69,7 +74,11 @@ export async function POST(req: NextRequest) {
 
   const response = await fetch(visionUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      // Force an allowed Referer so Google Cloud API Key website restrictions allow it
+      "Referer": "https://scan-n-pay.vercel.app/"
+    },
     body: JSON.stringify({
       requests: [
         {

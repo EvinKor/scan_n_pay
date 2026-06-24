@@ -23,12 +23,12 @@ export default function Home() {
     // Check current auth session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
     });
 
     // Check recent room from legacy identity
@@ -57,12 +57,17 @@ export default function Home() {
     };
   }, []);
 
-  async function fetchProfile(userId: string) {
-    const { data } = await supabase.from("profiles").select("display_name, icon").eq("id", userId).single();
+  async function fetchProfile(userId: string, email?: string) {
+    const { data } = await supabase.from("profiles").select("display_name, icon").eq("id", userId).maybeSingle();
     if (data?.display_name) {
       setName(data.display_name);
       setIcon(data.icon || "");
       loadAllHistory(data.display_name);
+    } else {
+      const defaultName = email ? email.split('@')[0] : "User";
+      await supabase.from("profiles").upsert({ id: userId, display_name: defaultName }, { onConflict: "id", ignoreDuplicates: true });
+      setName(defaultName);
+      loadAllHistory(defaultName);
     }
   }
 
@@ -266,8 +271,8 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-                <div className="space-y-2">
-                  {history.slice(0, 3).map(h => {
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                  {history.map(h => {
                     const myTotal = h.data?.totals?.[name] ?? 0;
                     const grandTotal = (h.data?.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0), 0) || 0) + (h.data?.serviceCharge || 0) + (h.data?.sst || 0);
                     const participantsList = Array.isArray(h.data?.participants)
@@ -319,11 +324,30 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <p className="mt-16 text-subtle text-xs text-center">
-        No account needed · Works offline · Pay via TNG
-      </p>
+      <div className="mt-16 space-y-4 text-center pb-8">
+        <p className="text-subtle text-xs">
+          No account needed · Works offline · Pay via TNG
+        </p>
+        <div className="flex justify-center gap-4">
+          <button 
+            onClick={() => router.push("/support")}
+            className="text-subtle hover:text-brand transition-colors p-2"
+          >
+            <svg xmlns="http://www.w3.org/0000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          </button>
+          <a 
+            href="https://www.instagram.com/us_b3ing_us?igsh=MWxhYXl2ZmF0Y3p6MA%3D%3D&utm_source=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-subtle hover:text-[#E1306C] transition-colors p-2"
+          >
+            <svg xmlns="http://www.w3.org/0000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+          </a>
+        </div>
+      </div>
 
 
     </main>
   );
 }
+

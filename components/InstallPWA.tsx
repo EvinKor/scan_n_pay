@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
 export default function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -97,7 +98,7 @@ export default function InstallPWA() {
       {showIOSInstructions && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setShowIOSInstructions(false)}>
           <div className="bg-surface border border-divider w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in slide-in-from-bottom-10 duration-300 mb-4" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowIOSInstructions(false)} className="absolute top-4 right-4 text-subtle hover:text-main bg-muted/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors">✕</button>
+            <button onClick={() => setShowIOSInstructions(false)} className="absolute top-4 right-4 text-subtle hover:text-main bg-muted/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><X size={16} /></button>
             <h3 className="text-xl font-bold text-main mb-2">Install App</h3>
             <p className="text-subtle text-sm mb-6">Install SplitLah on your home screen for quick access.</p>
             

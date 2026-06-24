@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Smartphone, ReceiptText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getLocalUser, setLocalUser } from "@/lib/identity";
 import InstallPWA from "@/components/InstallPWA";
@@ -29,7 +30,7 @@ export default function SettingPage() {
       setUser(currentUser);
       if (currentUser) {
         // Fetch from Supabase
-        supabase.from("profiles").select("display_name, icon, phone, tng_qr").eq("id", currentUser.id).single()
+        supabase.from("profiles").select("display_name, icon, phone, tng_qr").eq("id", currentUser.id).maybeSingle()
           .then(({ data }) => {
             if (data) {
               setName(data.display_name || "");
@@ -40,15 +41,7 @@ export default function SettingPage() {
             setLoading(false);
           });
       } else {
-        // Fetch from local storage
-        const local = getLocalUser();
-        if (local) {
-          setName(local.name || "");
-          setIcon(local.icon || "");
-          setPhone(local.phone || "");
-          setTngQr(local.tng_qr || "");
-        }
-        setLoading(false);
+        router.push("/login");
       }
     });
   }, []);
@@ -92,8 +85,7 @@ export default function SettingPage() {
         // Save to Supabase
         const { error: dbError } = await supabase
           .from("profiles")
-          .update({ display_name: name.trim(), icon, phone: phone.trim(), tng_qr: tngQr })
-          .eq("id", user.id);
+          .upsert({ id: user.id, display_name: name.trim(), icon, phone: phone.trim(), tng_qr: tngQr });
         if (dbError) throw dbError;
       }
 
@@ -141,13 +133,24 @@ export default function SettingPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Display Name</label>
+                <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Display Name <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-muted border border-divider rounded-xl px-4 py-3 text-main text-sm focus:outline-none focus:border-brand transition-colors"
                   maxLength={24}
+                />
+              </div>
+
+              <div>
+                <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Phone Number (TNG/DuitNow)</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. 0123456789"
+                  className="w-full bg-muted border border-divider rounded-xl px-4 py-3 text-main text-sm focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
 
@@ -193,7 +196,7 @@ export default function SettingPage() {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-2xl">📱</span>
+                      <span className="text-subtle"><Smartphone size={24} /></span>
                       <span className="text-subtle text-sm">Upload QR Code</span>
                       <span className="text-subtle text-xs">Used as default for new bills</span>
                     </div>
@@ -223,7 +226,7 @@ export default function SettingPage() {
                 className="w-full bg-transparent hover:bg-muted text-main font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">🧾</span>
+                  <span className="text-subtle"><ReceiptText size={20} /></span>
                   <span>View Past Receipts</span>
                 </div>
                 <span className="text-subtle">→</span>
@@ -263,3 +266,4 @@ export default function SettingPage() {
     </main>
   );
 }
+

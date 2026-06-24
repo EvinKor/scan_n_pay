@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getSessionByCode, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom } from "@/lib/identity";
+import { Frown, Sparkles, Dices } from "lucide-react";
 import clsx from "clsx";
+import { AnimalAvatar } from "@/components/AnimalAvatar";
 
 
 export default function JoinPage() {
@@ -18,9 +20,10 @@ export default function JoinPage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
   const [roomExists, setRoomExists] = useState(false);
-  const [participantNames, setParticipantNames] = useState<string[]>([]);
+  const [participantData, setParticipantData] = useState<{name: string, icon?: string}[]>([]);
   const [owner, setOwner] = useState("");
   const [claimMode, setClaimMode] = useState(false); // true when using ?as= link
+  const [iconOverride, setIconOverride] = useState<string | undefined>();
 
   const RANDOM_NAMES = [
     "SleepyPanda", "HappyOtter", "CleverFox", "ChillCapybara", "SneakyRaccoon",
@@ -48,10 +51,11 @@ export default function JoinPage() {
         setOwner(session.owner);
         
         // Exclude the owner from the selectable list so no one can join as them
-        const existingNames = session.participants.map((p) => p.name).filter(n => n !== session.owner);
-        setParticipantNames(existingNames);
+        const existingData = session.participants.filter(p => p.name !== session.owner);
+        setParticipantData(existingData);
 
         // If ?as=Name is provided and that name exists in the room, auto-claim
+        const existingNames = existingData.map(p => p.name);
         if (claimAs && existingNames.includes(claimAs)) {
           setName(claimAs);
           setClaimMode(true);
@@ -72,9 +76,9 @@ export default function JoinPage() {
     setLoading(true);
     setError("");
     try {
-      const session = await joinSession(code.toUpperCase(), name.trim());
-      setLocalUser({ name: name.trim(), sessionId: session.id });
-      setLocalUserForRoom(session.id, name.trim());
+      const session = await joinSession(code.toUpperCase(), name.trim(), iconOverride);
+      setLocalUser({ name: name.trim(), sessionId: session.id, icon: iconOverride });
+      setLocalUserForRoom(session.id, name.trim(), iconOverride);
       router.push(`/room/${session.id}`);
     } catch (e: any) {
       setError(e.message || "Failed to join. Try again.");
@@ -96,7 +100,7 @@ export default function JoinPage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-6">
         <div className="text-center space-y-4">
-          <span className="text-5xl">😕</span>
+          <span className="text-subtle mb-4 flex justify-center"><Frown size={56} /></span>
           <h1 className="text-xl font-bold text-main">Room Not Found</h1>
           <p className="text-subtle text-sm max-w-xs">
             The room <span className="text-brand font-mono">{code}</span> doesn't exist or has expired.
@@ -131,36 +135,42 @@ export default function JoinPage() {
       {/* Join form */}
       <div className="w-full max-w-sm space-y-4">
         {/* Animal avatar */}
-        <div className="bg-surface rounded-2xl p-5 text-center">
-          <div className="text-4xl mb-2">
-            {getAnimalEmoji(name)}
+        <div className="bg-surface rounded-2xl p-5 text-center relative">
+          <div className="text-4xl mb-2 relative inline-block">
+            <AnimalAvatar name={name} customIcon={iconOverride} className="w-20 h-20 mx-auto" />
+            <button 
+              onClick={() => setIconOverride(Math.floor(Math.random() * 20).toString())}
+              className="absolute -bottom-2 -right-2 bg-muted rounded-full p-2 border border-divider shadow-md hover:bg-divider text-subtle hover:text-main transition-colors"
+            >
+              <Dices size={16} />
+            </button>
           </div>
-          <p className="text-main font-semibold text-lg mb-1">{name}</p>
+          <p className="text-main font-semibold text-lg mt-2 mb-1">{name}</p>
           <p className="text-subtle text-xs">
             {claimMode
               ? "The host pre-created this spot for you"
-              : "Your auto-generated name"}
+              : "Your display name"}
           </p>
         </div>
 
         {/* Select existing member or enter new name */}
-        {!claimMode && participantNames.length > 0 && (
+        {!claimMode && participantData.length > 0 && (
           <div className="mb-6">
             <p className="text-subtle text-xs uppercase tracking-wide mb-3">Join as existing member</p>
             <div className="flex flex-wrap gap-2">
-              {participantNames.map((p) => (
+              {participantData.map((p) => (
                 <button
-                  key={p}
-                  onClick={() => { setName(p); setError(""); }}
+                  key={p.name}
+                  onClick={() => { setName(p.name); setError(""); setIconOverride(p.icon); }}
                   className={clsx(
                     "px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2",
-                    name === p
+                    name === p.name
                       ? "bg-brand text-white shadow-md shadow-brand/20"
                       : "bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted"
                   )}
                 >
-                  <span className="text-xl">{getAnimalEmoji(p)}</span>
-                  {p}
+                  <AnimalAvatar name={p.name} customIcon={p.icon} className="w-6 h-6" />
+                  {p.name}
                 </button>
               ))}
             </div>
@@ -176,12 +186,12 @@ export default function JoinPage() {
         {!claimMode && (
           <div>
             <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">
-              {participantNames.length > 0 ? "Join as new member" : "Change your name (optional)"}
+              {participantData.length > 0 ? "Join as new member" : "Change your name (optional)"}
             </label>
             <input
               type="text"
-              placeholder={participantNames.length > 0 ? "Enter a new name" : "Your display name"}
-              value={participantNames.includes(name) ? "" : name}
+              placeholder={participantData.length > 0 ? "Enter a new name" : "Your display name"}
+              value={participantData.find(p => p.name === name) ? "" : name}
               onChange={(e) => { setName(e.target.value); setError(""); }}
               className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
               maxLength={24}
@@ -191,7 +201,7 @@ export default function JoinPage() {
 
         {claimMode && (
           <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center">
-            <p className="text-brand text-sm">✨ The host already selected your items for you!</p>
+            <p className="text-brand text-sm flex items-center justify-center gap-1.5"><Sparkles size={16} /> The host already selected your items for you!</p>
             <p className="text-subtle text-xs mt-1">Tap below to jump into the room</p>
           </div>
         )}
@@ -223,26 +233,4 @@ export default function JoinPage() {
       </p>
     </main>
   );
-}
-
-/** Map the animal name to a fun emoji */
-function getAnimalEmoji(name: string): string {
-  const lower = name.toLowerCase();
-  const map: Record<string, string> = {
-    otter: "🦦", panda: "🐼", capybara: "🦫", raccoon: "🦝", fox: "🦊",
-    penguin: "🐧", koala: "🐨", sloth: "🦥", quokka: "🐹", hedgehog: "🦔",
-    hamster: "🐹", bunny: "🐰", duckling: "🐤", kitten: "🐱", puppy: "🐶",
-    parrot: "🦜", toucan: "🐦", dolphin: "🐬", seal: "🦭", owl: "🦉",
-    gecko: "🦎", chameleon: "🦎", axolotl: "🦎", flamingo: "🦩", alpaca: "🦙",
-    llama: "🦙", corgi: "🐕", shiba: "🐕", moose: "🫎", beaver: "🦫",
-    badger: "🦡", ferret: "🐿️", meerkat: "🐿️", pangolin: "🐾", walrus: "🦭",
-    narwhal: "🐋", puffin: "🐧", robin: "🐦", sparrow: "🐦", chinchilla: "🐭",
-    lemur: "🐒", tapir: "🐾", ocelot: "🐆", lynx: "🐈", mantis: "🦗",
-    starfish: "⭐", jellyfish: "🪼", crab: "🦀", lobster: "🦞", turtle: "🐢",
-  };
-
-  for (const [animal, emoji] of Object.entries(map)) {
-    if (lower.includes(animal)) return emoji;
-  }
-  return "🐾";
 }

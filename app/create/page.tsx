@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Smartphone, Scale, Target } from "lucide-react";
 import { createSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom, getLocalUser } from "@/lib/identity";
 import { supabase } from "@/lib/supabase";
@@ -21,14 +22,14 @@ export default function CreatePage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
-      else loadLocalName();
+      loadLocalName();
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
-      else loadLocalName();
+      loadLocalName();
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
     });
 
     return () => subscription.unsubscribe();
@@ -43,12 +44,18 @@ export default function CreatePage() {
     }
   }
 
-  async function fetchProfile(userId: string) {
-    const { data } = await supabase.from("profiles").select("display_name, tng_qr, phone").eq("id", userId).single();
-    if (data) {
-      if (data.display_name) setName(data.display_name);
+  async function fetchProfile(userId: string, email?: string) {
+    const { data } = await supabase.from("profiles").select("display_name, tng_qr, phone").eq("id", userId).maybeSingle();
+    const local = getLocalUser();
+    
+    if (data?.display_name) {
+      setName(data.display_name);
       if (data.tng_qr) setQrImage(data.tng_qr);
       if (data.phone) setPhone(data.phone);
+    } else {
+      const defaultName = local?.name || (email ? email.split('@')[0] : "User");
+      await supabase.from("profiles").upsert({ id: userId, display_name: defaultName }, { onConflict: "id", ignoreDuplicates: true });
+      setName(defaultName);
     }
   }
 
@@ -84,7 +91,7 @@ export default function CreatePage() {
     try {
       const local = getLocalUser();
       const session = await createSession(name.trim(), selectedMode, qrImage || undefined, local?.icon, phone.trim(), groupName.trim());
-      setLocalUser({ name: name.trim(), sessionId: session.id, icon: local?.icon, phone: phone.trim() });
+      setLocalUser({ name: name.trim(), sessionId: session.id, icon: local?.icon, phone: phone.trim(), tng_qr: qrImage || undefined });
       setLocalUserForRoom(session.id, name.trim(), local?.icon);
       router.push(`/scan?session=${session.id}`);
     } catch (e) {
@@ -138,7 +145,7 @@ export default function CreatePage() {
                 maxLength={30}
               />
 
-              <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Phone Number / DuitNow ID</label>
+              <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Phone Number / DuitNow ID <span className="text-red-400">*</span></label>
               <input
                 type="text"
                 value={phone}
@@ -164,7 +171,7 @@ export default function CreatePage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1">
-                    <span className="text-2xl">📱</span>
+                    <span className="text-subtle"><Smartphone size={24} /></span>
                     <span className="text-subtle text-sm">Upload your TNG/DuitNow QR</span>
                     <span className="text-subtle text-xs">Guests can save & scan it to pay</span>
                   </div>
@@ -177,6 +184,7 @@ export default function CreatePage() {
               <button
                 onClick={() => {
                   if (!name.trim()) return setError("Enter your name first");
+                  if (!phone.trim()) return setError("Enter your phone number first");
                   setError("");
                   setStep(2);
                 }}
@@ -209,7 +217,7 @@ export default function CreatePage() {
                 disabled={loading}
                 className={`flex flex-col items-center justify-center p-6 rounded-2xl transition-all ${loading && splitMode === "even" ? "bg-brand/20 border-2 border-brand text-brand scale-95 shadow-md shadow-brand/20" : "bg-surface/80 backdrop-blur-md border-2 border-divider text-subtle hover:border-divider hover:-translate-y-1"} ${loading && splitMode !== "even" ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
               >
-                <span className="text-4xl mb-3">⚖️</span>
+                <span className="bg-blue-500/20 p-3 rounded-full text-blue-400 mb-3"><Scale size={36} /></span>
                 <span className="font-bold text-lg text-main">Evenly</span>
                 <span className="text-xs text-center mt-2 opacity-80">Split the total equally among everyone</span>
               </button>
@@ -219,7 +227,7 @@ export default function CreatePage() {
                 disabled={loading}
                 className={`flex flex-col items-center justify-center p-6 rounded-2xl transition-all ${loading && splitMode === "byItem" ? "bg-brand/20 border-2 border-brand text-brand scale-95 shadow-md shadow-brand/20" : "bg-surface/80 backdrop-blur-md border-2 border-divider text-subtle hover:border-divider hover:-translate-y-1"} ${loading && splitMode !== "byItem" ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
               >
-                <span className="text-4xl mb-3">🎯</span>
+                <span className="bg-brand/20 p-3 rounded-full text-brand mb-3"><Target size={36} /></span>
                 <span className="font-bold text-lg text-main">By Item</span>
                 <span className="text-xs text-center mt-2 opacity-80">Each person claims their own items</span>
               </button>
@@ -235,3 +243,4 @@ export default function CreatePage() {
     </main>
   );
 }
+

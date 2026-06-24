@@ -17,13 +17,13 @@ export default function JoinPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
       else loadLocalName();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.user.email);
       else loadLocalName();
     });
 
@@ -37,10 +37,14 @@ export default function JoinPage() {
     }
   }
 
-  async function fetchProfile(userId: string) {
-    const { data } = await supabase.from("profiles").select("display_name").eq("id", userId).single();
+  async function fetchProfile(userId: string, email?: string) {
+    const { data } = await supabase.from("profiles").select("display_name").eq("id", userId).maybeSingle();
     if (data?.display_name) {
       setName(data.display_name);
+    } else {
+      const defaultName = email ? email.split('@')[0] : "User";
+      await supabase.from("profiles").upsert({ id: userId, display_name: defaultName }, { onConflict: "id", ignoreDuplicates: true });
+      setName(defaultName);
     }
   }
 
@@ -118,3 +122,4 @@ export default function JoinPage() {
     </main>
   );
 }
+

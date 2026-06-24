@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSession, updateSession, subscribeToSession, deleteSession, Session } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom } from "@/lib/identity";
+import { Scale, Target } from "lucide-react";
 import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 
@@ -133,7 +134,7 @@ export default function RoomSettingsPage() {
             </button>
           </div>
           <div className="bg-muted border border-divider/50 rounded-xl px-4 py-3 flex items-center gap-3">
-            <span className="text-2xl">{session.splitMode === "even" ? "⚖️" : "🎯"}</span>
+            <span className="text-subtle flex items-center justify-center">{session.splitMode === "even" ? <Scale size={24} /> : <Target size={24} />}</span>
             <span className="text-main font-medium text-sm">{session.splitMode === "even" ? "Split evenly" : "Choose items"}</span>
           </div>
         </div>
@@ -195,7 +196,7 @@ export default function RoomSettingsPage() {
                   session.splitMode === "even" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider/50 text-main hover:bg-muted"
                 )}
               >
-                ⚖️ Split evenly
+                <span className="flex items-center gap-2"><Scale size={18} className="text-subtle" /> Split evenly</span>
               </button>
               <button
                 onClick={() => handleSplitModeChange("byItem")}
@@ -204,7 +205,7 @@ export default function RoomSettingsPage() {
                   session.splitMode === "byItem" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider/50 text-main hover:bg-muted"
                 )}
               >
-                🎯 Choose items
+                <span className="flex items-center gap-2"><Target size={18} className="text-subtle" /> Choose items</span>
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Ghost, ReceiptText, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getLocalHistory, getLocalUser } from "@/lib/identity";
 import clsx from "clsx";
@@ -21,7 +22,7 @@ export default function HistoryPage() {
     // 2. Fetch profile if logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        supabase.from("profiles").select("display_name").eq("id", session.user.id).single()
+        supabase.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle()
           .then(({ data }) => {
             if (data?.display_name) {
               setMyName(data.display_name);
@@ -99,7 +100,7 @@ export default function HistoryPage() {
           </div>
         ) : history.length === 0 ? (
           <div className="text-center py-12 bg-surface/80 backdrop-blur-md border border-divider rounded-2xl">
-            <span className="text-4xl mb-4 block">👻</span>
+            <span className="text-subtle mb-4 flex justify-center"><Ghost size={48} /></span>
             <p className="text-subtle">No past receipts found.</p>
           </div>
         ) : (
@@ -132,7 +133,7 @@ export default function HistoryPage() {
                   <div className="flex justify-between items-start mb-3">
                     <div className="relative z-20">
                       <p className="text-main font-mono font-bold text-lg flex items-center gap-2">
-                        <span>🧾</span>
+                        <span className="text-subtle"><ReceiptText size={16} /></span>
                         {h.data?.name || h.code}
                       </p>
                       <p className="text-subtle text-xs mt-0.5">
@@ -154,7 +155,7 @@ export default function HistoryPage() {
                   <div className="bg-background rounded-lg p-2.5 border border-divider/50">
                     <p className="text-subtle text-[10px] uppercase tracking-widest font-bold mb-1">Owner: {h.data?.owner || "Unknown"}</p>
                     <p className="text-main text-xs line-clamp-2 leading-relaxed">
-                      👥 {participantsList || "Unknown"}
+                          <Users size={12} className="inline-block mr-1 text-subtle" /> {participantsList || "Unknown"}
                     </p>
                   </div>
                 </button>
@@ -166,3 +167,4 @@ export default function HistoryPage() {
     </main>
   );
 }
+

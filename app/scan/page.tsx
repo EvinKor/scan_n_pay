@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractReceiptItems, ReceiptResult } from "@/lib/ocr";
-import { getSession, updateSession, LineItem, Session } from "@/lib/session";
+import { getSession, updateSession, LineItem, Session, subscribeToSession } from "@/lib/session";
 import { getLocalUser, getLocalUserForRoom } from "@/lib/identity";
 import { customAlphabet } from "nanoid";
 import clsx from "clsx";
@@ -45,6 +45,10 @@ export default function ScanPage() {
     if (!user) { router.push("/"); return; }
     getSession(id).then((s) => {
       if (!s) { router.push("/"); return; }
+      if (s.status !== "scanning") {
+        router.push(`/room/${id}`);
+        return;
+      }
       setSession(s);
       setItems(s.items || []);
       setPaidBy(s.paidBy || user.name);
@@ -53,7 +57,21 @@ export default function ScanPage() {
       setRounding(s.rounding || 0);
       setReceiptTotal(s.receiptTotal || 0);
     });
+
+    const channel = subscribeToSession(id, (updated) => {
+      if (updated.status !== "scanning") {
+        router.push(`/room/${id}`);
+      } else {
+        setSession(updated);
+      }
+    });
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [sessionId]);
+
+  const isOwner = session?.owner === user?.name;
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -109,6 +127,18 @@ export default function ScanPage() {
 
   function updateItem(id: string, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
+
+  function handleReset() {
+    if (!confirm("Are you sure you want to clear all items and start over?")) return;
+    setItems([]);
+    setServiceCharge(0);
+    setSst(0);
+    setRounding(0);
+    setReceiptTotal(0);
+    setPreview(null);
+    setReceiptBase64("");
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   async function handleNext() {
@@ -169,6 +199,18 @@ export default function ScanPage() {
 
   const total = items.reduce((s, i) => s + (Number(i.price) || 0), 0) + (serviceCharge || 0) + (sst || 0) + (rounding || 0);
 
+  if (session && user && !isOwner) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-[#0f0f0f]">
+        <div className="w-12 h-12 rounded-full border-2 border-brand border-t-transparent animate-spin mb-6 mx-auto" />
+        <h2 className="text-xl font-bold text-main mb-2">Waiting for Host</h2>
+        <p className="text-subtle text-sm max-w-xs mx-auto">
+          The host is currently scanning and adjusting the receipt items. You will automatically join them once they are done.
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen pb-32 px-6 pt-12 max-w-lg mx-auto bg-[#0f0f0f]">
       <header className="mb-10 flex justify-between items-start">
@@ -180,9 +222,10 @@ export default function ScanPage() {
         </div>
         <button 
           onClick={() => router.push(`/room/${sessionId}/settings`)}
-          className="flex items-center gap-1 text-subtle hover:text-main font-medium transition-colors text-sm px-2 py-1.5 -mr-2 flex-shrink-0"
+          className="flex items-center gap-1.5 text-subtle hover:text-main font-medium transition-colors text-sm px-2 py-1.5 -mr-2 flex-shrink-0"
         >
-          ⚙️ Settings
+          <svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Settings
         </button>
       </header>
 
@@ -206,11 +249,14 @@ export default function ScanPage() {
                   <div className="absolute inset-0 z-10 bg-black/20" />
                   <div className="absolute left-0 w-full h-[2px] bg-brand animate-scan-beam z-20 shadow-[0_0_15px_rgba(138,154,91,0.5)]" />
                   <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
-                    <div className="bg-black/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-brand/30 flex flex-col items-center animate-pulse-glow">
-                      <span className="text-brand font-mono font-bold text-sm mb-1">
-                        {progress < 30 ? "Analyzing layout..." : progress < 70 ? "Extracting text..." : "Parsing items..."}
-                      </span>
-                      <span className="text-main text-xs">{progress}%</span>
+                    <div className="bg-surface/95 backdrop-blur-md px-5 py-4 rounded-2xl border border-divider flex items-center gap-4 shadow-xl">
+                      <div className="w-5 h-5 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+                      <div className="flex flex-col text-left">
+                        <span className="text-main font-semibold text-sm">
+                          {progress < 30 ? "Reading receipt..." : progress < 70 ? "Finding items..." : "Finishing up..."}
+                        </span>
+                        <span className="text-subtle text-[11px]">{progress}%</span>
+                      </div>
                     </div>
                   </div>
                 </>
@@ -224,13 +270,16 @@ export default function ScanPage() {
                   }}
                   className="bg-muted border border-divider hover:bg-divider active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 mt-2"
                 >
-                  🔄 Rescan / Upload New
+                  <svg xmlns="http://www.w3.org/0000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                  Rescan / Upload New
                 </button>
               )}
             </div>
         ) : (
             <div className="text-center">
-              <span className="block text-2xl mb-3 text-zinc-500">📸</span>
+              <span className="block text-zinc-500 mb-3 flex justify-center">
+                <svg xmlns="http://www.w3.org/0000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+              </span>
               <p className="text-zinc-300 text-sm font-medium">Upload Receipt</p>
               <p className="text-zinc-500 text-xs mt-1">Take a photo or choose from gallery</p>
             </div>
@@ -251,6 +300,12 @@ export default function ScanPage() {
               <h2 className="text-xs text-zinc-500 uppercase tracking-widest font-medium">
                 Line Items
               </h2>
+              <button 
+                onClick={handleReset} 
+                className="text-red-400 hover:text-red-300 text-xs font-medium px-2 py-1 bg-red-400/10 rounded-md transition-colors"
+              >
+                Clear All
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -420,8 +475,12 @@ export default function ScanPage() {
                     <p className="text-subtle text-xs">Share invite link — tap to share</p>
                     <p className="text-brand font-mono font-semibold tracking-widest">{session.code}</p>
                   </div>
-                  <span className="text-xl">
-                    {linkCopied ? "✅" : "🔗"}
+                  <span className="text-main">
+                    {linkCopied ? (
+                      <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    )}
                   </span>
                 </div>
               )}

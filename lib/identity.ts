@@ -58,8 +58,10 @@ export function clearLocalUserForRoom(sessionId: string) {
 
 // ── Legacy Global Identity (kept for backward compat) ──
 
-export function setLocalUser(user: LocalUser) {
-  localStorage.setItem(LEGACY_KEY, JSON.stringify(user));
+export function setLocalUser(user: Partial<LocalUser>) {
+  const existing = getLocalUser() || {};
+  const cleanedUser = Object.fromEntries(Object.entries(user).filter(([_, v]) => v !== undefined));
+  localStorage.setItem(LEGACY_KEY, JSON.stringify({ ...existing, ...cleanedUser }));
 }
 
 export function getLocalUser(): LocalUser | null {

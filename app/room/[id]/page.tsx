@@ -16,6 +16,7 @@ import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom, addRoomToLocalH
 import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 import { QRCodeSVG } from "qrcode.react";
+import { Scale, Target, Check, Link2, CreditCard, Banknote, Heart, AlertTriangle, Zap, Paperclip, PartyPopper, Flag, Download, Camera, ClipboardList, ReceiptText, Settings, Plus, X, Copy } from "lucide-react";
 
 type Tab = "split" | "pay";
 
@@ -101,6 +102,15 @@ export default function RoomPage() {
 
   const isOwner = session?.owner === myName;
   const effectiveName = myName;
+
+  // Auto-switch to payment tab when owner changes session status
+  const prevStatus = useRef(session?.status);
+  useEffect(() => {
+    if (session?.status === "payment" && prevStatus.current !== "payment") {
+      setTab("pay");
+    }
+    prevStatus.current = session?.status;
+  }, [session?.status]);
 
   function debouncedUpdateSession(patch: Partial<Session>) {
     if (updateTimeout.current) clearTimeout(updateTimeout.current);
@@ -602,7 +612,7 @@ export default function RoomPage() {
           <div className="flex justify-between items-end border-b border-divider pb-2 mb-2">
             <div className="flex flex-col gap-0.5">
               <p className="text-xs text-subtle uppercase tracking-widest font-bold">
-                📋 Receipt Items
+                <ClipboardList size={16} className="inline-block mr-1" /> Receipt Items
               </p>
               {s.splitMode === "byItem" && (
                 <p className="text-[10px] text-brand italic">tap to claim yours</p>
@@ -628,7 +638,7 @@ export default function RoomPage() {
         {addedItems.length > 0 && (
           <div className="mt-6">
             <p className="text-xs text-subtle uppercase tracking-widest mb-2 font-bold border-b border-divider pb-1">
-              ➕ Added Later
+              <Plus size={16} className="inline-block mr-1" /> Added Later
               {myParticipant?.hasPaid && (
                 <span className="ml-2 text-yellow-600 normal-case italic">unpaid add-ons</span>
               )}
@@ -742,7 +752,7 @@ export default function RoomPage() {
                 onClick={() => router.push(`/room/${id}/settings`)}
                 className="bg-muted text-main w-8 h-8 rounded-full flex items-center justify-center hover:bg-divider active:scale-95 transition-all"
               >
-                ⚙️
+                <Settings size={16} />
               </button>
             )}
           </div>
@@ -777,7 +787,7 @@ export default function RoomPage() {
               <p className="text-brand font-mono font-semibold tracking-widest">{session.code}</p>
             </div>
             <span className="text-xl">
-              {linkCopied ? "✅" : "🔗"}
+              {linkCopied ? <Check size={16} className="inline-block text-green-500" /> : <Link2 size={16} className="inline-block" />}
             </span>
           </div>
           <button
@@ -830,7 +840,7 @@ export default function RoomPage() {
           <div className="bg-surface/80 backdrop-blur-md border border-divider/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xl">
-                {session.splitMode === "even" ? "⚖️" : "🎯"}
+                {session.splitMode === "even" ? <Scale size={16} /> : <Target size={16} />}
               </div>
               <div>
                 <p className="text-subtle text-[10px] uppercase tracking-widest font-bold mb-0.5">Splitting Method</p>
@@ -876,7 +886,7 @@ export default function RoomPage() {
                     )}
                   >
                     <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-1.5 w-6 h-6" />{p.name}
-                    {p.name === session.paidBy && <span className="ml-1 text-xs">💳</span>}
+                    {p.name === session.paidBy && <span className="ml-1 text-xs"><CreditCard size={14} /></span>}
                     {p.name === myName && p.name !== session.paidBy && <span className="ml-1 text-xs">(you)</span>}
                     {isOwner && session.status !== "done" && p.name !== myName && (
                       <span className="ml-1 text-subtle text-[10px]">▼</span>
@@ -893,7 +903,7 @@ export default function RoomPage() {
                         }}
                         className="text-left px-3 py-2 text-sm text-main hover:text-main hover:bg-muted rounded-lg flex items-center gap-2 transition-colors"
                       >
-                        <span className="text-lg">{friendLinkCopied === p.name ? "✅" : "🔗"}</span>
+                        <span className="text-lg">{friendLinkCopied === p.name ? <Check size={18} className="text-green-500" /> : <Link2 size={18} />}</span>
                         Share claim link
                       </button>
                       {session.splitMode === "byItem" && (
@@ -904,7 +914,7 @@ export default function RoomPage() {
                           }}
                           className="text-left px-3 py-2 text-sm text-main hover:text-main hover:bg-muted rounded-lg flex items-center gap-2 transition-colors"
                         >
-                          <span className="text-lg">🎯</span>
+                          <span className="text-lg"><Target size={18} /></span>
                           Help pick items
                         </button>
                       )}
@@ -969,7 +979,7 @@ export default function RoomPage() {
                 onClick={() => setViewingReceipt(session.receiptImage!)}
                 className="text-xs text-brand underline decoration-brand/50 hover:decoration-brand underline-offset-4 flex items-center gap-1.5 transition-colors"
               >
-                <span>🧾</span> View Scanned Receipt
+                <span className="flex items-center gap-2"><ReceiptText size={16} /> View Scanned Receipt</span>
               </button>
             </div>
           )}
@@ -1057,7 +1067,7 @@ export default function RoomPage() {
             </div>
             {session.receiptTotal > 0 && Math.abs(grandTotal - session.receiptTotal) >= 0.05 && (
               <div className="flex justify-between items-center">
-                <span className="text-yellow-400 text-xs">⚠ Receipt says</span>
+                <span className="text-yellow-400 text-xs flex items-center gap-1"><AlertTriangle size={12} /> Receipt says</span>
                 <span className="font-mono text-xs text-yellow-400">
                   RM {session.receiptTotal.toFixed(2)}
                 </span>
@@ -1182,12 +1192,12 @@ export default function RoomPage() {
                                     </span>
                                     {isFullyPaid && (
                                       <span className="text-brand text-xs flex items-center gap-1">
-                                        ✓ {p.paymentMethod === "cash" ? "Cash" : p.paymentMethod === "tng" ? "TNG" : p.paymentMethod === "other" ? "Other" : "paid"}
+                                        <Check size={14} className="inline-block mr-1" /> {p.paymentMethod === "cash" ? "Cash" : p.paymentMethod === "tng" ? "TNG" : p.paymentMethod === "other" ? "Other" : "paid"}
                                       </span>
                                     )}
                                     {hasUnpaidBalance && (
                                       <span className="text-yellow-400 text-xs flex items-center gap-1">
-                                        ⚡ Unpaid Add-ons
+                                        <Zap size={14} className="inline-block text-yellow-400 mr-1" /> Unpaid Add-ons
                                       </span>
                                     )}
                                   </>
@@ -1200,7 +1210,7 @@ export default function RoomPage() {
                                   onClick={() => setViewingProof(p.proofUrl!)}
                                   className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full hover:bg-brand/30 transition-colors"
                                 >
-                                  📎 Proof
+                                  <Paperclip size={14} className="inline-block mr-1" /> Proof
                                 </button>
                               )}
                               <span className="font-mono text-sm text-main font-semibold">
@@ -1215,7 +1225,7 @@ export default function RoomPage() {
                                   className="ml-1 w-5 h-5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-main flex items-center justify-center transition-colors"
                                   title="Remove participant"
                                 >
-                                  <span className="text-[12px] leading-none mb-0.5">✕</span>
+                                  <X size={12} />
                                 </button>
                               )}
                             </div>
@@ -1347,7 +1357,7 @@ export default function RoomPage() {
               )}
               {pendingCount === 0 && session.participants.filter(p => p.name !== session.paidBy).length > 0 && (
                 <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center">
-                  <p className="text-brand font-semibold">🎉 Everyone has paid!</p>
+                  <p className="text-brand font-semibold flex items-center justify-center gap-2"><PartyPopper size={18} /> Everyone has paid!</p>
                 </div>
               )}
               {pendingCount === 0 && session.participants.filter(p => p.name !== session.paidBy).length === 0 && (
@@ -1374,7 +1384,7 @@ export default function RoomPage() {
                 </div>
               ) : (
                 <div className="bg-[#015ABF]/10 border border-[#015ABF]/30 rounded-2xl p-4 text-center mt-6">
-                  <p className="text-[#015ABF] font-bold text-lg">Receipt Settled 🏁</p>
+                  <p className="text-[#015ABF] font-bold text-lg flex items-center justify-center gap-2">Receipt Settled <Flag size={18} /></p>
                   <p className="text-[#015ABF]/80 text-sm mt-1">This receipt is finalized and cannot be modified.</p>
                 </div>
               )}
@@ -1472,10 +1482,10 @@ export default function RoomPage() {
                 {myParticipant?.hasPaid && (
                   <div className="bg-brand/5 border border-brand/20 rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-brand text-xs font-semibold uppercase tracking-wide">✅ Paid</span>
+                      <span className="text-brand text-xs font-semibold uppercase tracking-wide flex items-center gap-1"><Check size={14} /> Paid</span>
                       {myParticipant.paymentMethod && (
                         <span className="text-subtle text-xs">
-                          via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 TNG" : "💳 Other"}
+                          via {myParticipant.paymentMethod === "cash" ? <><Banknote size={14} className="inline-block mr-1" /> Cash</> : myParticipant.paymentMethod === "tng" ? <><Heart size={14} fill="currentColor" className="inline-block text-brand mr-1" /> TNG</> : <><CreditCard size={14} className="inline-block mr-1" /> Other</>}
                         </span>
                       )}
                       <span className="ml-auto text-brand font-mono text-sm font-bold">
@@ -1492,7 +1502,7 @@ export default function RoomPage() {
                 {hasUnpaidAddOns ? (
                   <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wide">⚡ Add-ons (unpaid)</span>
+                      <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wide flex items-center gap-1"><Zap size={14} /> Add-ons (unpaid)</span>
                       <span className="ml-auto text-yellow-400 font-mono text-sm font-bold">
                         RM {addOnSubtotal.toFixed(2)}
                       </span>
@@ -1570,10 +1580,10 @@ export default function RoomPage() {
                 {/* Payment flow */}
                 {myParticipant?.hasPaid && !hasUnpaidAddOns ? (
                   <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 text-center space-y-2">
-                    <p className="text-brand font-semibold">✓ You're all paid up!</p>
+                    <p className="text-brand font-semibold flex items-center gap-1"><Check size={16} /> You're all paid up!</p>
                     {myParticipant.paymentMethod && (
                       <p className="text-subtle text-xs">
-                        via {myParticipant.paymentMethod === "cash" ? "💵 Cash" : myParticipant.paymentMethod === "tng" ? "💚 Touch 'n Go" : "💳 Other"}
+                        via {myParticipant.paymentMethod === "cash" ? <><Banknote size={14} className="inline-block mr-1" /> Cash</> : myParticipant.paymentMethod === "tng" ? <><Heart size={14} fill="currentColor" className="inline-block text-brand mr-1" /> Touch 'n Go</> : <><CreditCard size={14} className="inline-block mr-1" /> Other</>}
                       </p>
                     )}
                   </div>
@@ -1588,21 +1598,21 @@ export default function RoomPage() {
                         onClick={() => setPaymentMethod("tng")}
                         className="bg-[#015ABF] hover:bg-[#0147a0] text-main font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
                       >
-                        <span className="text-2xl">💚</span>
+                        <span className="text-subtle"><Heart size={24} fill="currentColor" className="text-brand" /></span>
                         TNG
                       </button>
                       <button
                         onClick={() => setPaymentMethod("cash")}
                         className="bg-emerald-600 hover:bg-emerald-700 text-main font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
                       >
-                        <span className="text-2xl">💵</span>
+                        <span className="text-subtle"><Banknote size={24} /></span>
                         Cash
                       </button>
                       <button
                         onClick={() => setPaymentMethod("other")}
                         className="bg-muted hover:bg-divider text-main font-semibold rounded-2xl py-4 text-sm flex flex-col items-center gap-2 active:scale-95 transition-all"
                       >
-                        <span className="text-2xl">💳</span>
+                        <span className="text-subtle"><CreditCard size={24} /></span>
                         Other
                       </button>
                     </div>
@@ -1612,7 +1622,7 @@ export default function RoomPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-subtle uppercase tracking-wide">
-                        Paying via {paymentMethod === "tng" ? "💚 Touch 'n Go" : paymentMethod === "cash" ? "💵 Cash" : "💳 Other"}
+                        Paying via {paymentMethod === "tng" ? <><Heart size={16} fill="currentColor" className="inline-block text-brand mr-1" /> Touch 'n Go</> : paymentMethod === "cash" ? <><Banknote size={16} className="inline-block mr-1" /> Cash</> : <><CreditCard size={16} className="inline-block mr-1" /> Other</>}
                       </p>
                       <button
                         onClick={() => { setPaymentMethod(null); setProofImage(null); }}
@@ -1642,7 +1652,7 @@ export default function RoomPage() {
                               onClick={handleSaveQR}
                               className="w-full bg-muted text-main border border-divider font-bold rounded-xl py-3 text-sm flex items-center justify-center gap-2 hover:bg-divider active:scale-95 transition-all"
                             >
-                              <span className="text-lg">📥</span>
+                              <span className="text-subtle"><Download size={18} /></span>
                               1. Save QR to Photos
                             </button>
                           </div>
@@ -1653,26 +1663,42 @@ export default function RoomPage() {
                           className="w-full bg-[#015ABF] text-main font-bold rounded-2xl py-4 text-base flex flex-col items-center justify-center gap-1 hover:bg-[#0147a0] active:scale-95 transition-all"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">💚</span>
+                            <span className="text-subtle"><Heart size={20} fill="currentColor" className="text-brand" /></span>
                             {session.qrImage ? "2. Open TNG App" : "Open TNG App"}
                           </div>
                           <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
                         </button>
 
-                        {session.paidByPhone && (
+                        <div className="flex gap-2">
+                          {session.paidByPhone && (
+                            <button
+                              onClick={(e) => {
+                                const phoneToCopy = session.paidByPhone?.startsWith("0") ? session.paidByPhone.substring(1) : session.paidByPhone;
+                                navigator.clipboard.writeText(phoneToCopy || "");
+                                const btn = e.currentTarget;
+                                const original = btn.innerText;
+                                btn.innerText = "Copied Phone!";
+                                setTimeout(() => (btn.innerText = original), 2000);
+                              }}
+                              className="flex-1 bg-surface/80 backdrop-blur-md border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
+                              title={session.paidByPhone}
+                            >
+                              <Copy size={16} className="inline-block mr-1" /> Copy Phone
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
-                              navigator.clipboard.writeText(session.paidByPhone);
+                              navigator.clipboard.writeText(amountToPay.toFixed(2));
                               const btn = e.currentTarget;
                               const original = btn.innerText;
-                              btn.innerText = "Copied!";
+                              btn.innerText = "Copied Amount!";
                               setTimeout(() => (btn.innerText = original), 2000);
                             }}
-                            className="w-full bg-surface/80 backdrop-blur-md border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all"
+                            className="flex-1 bg-surface/80 backdrop-blur-md border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
                           >
-                            📋 Copy Phone Number ({session.paidByPhone})
+                            <Copy size={16} className="inline-block mr-1" /> RM {amountToPay.toFixed(2)}
                           </button>
-                        )}
+                        </div>
                       </div>
                     )}
 
@@ -1695,7 +1721,7 @@ export default function RoomPage() {
                             onClick={() => setProofImage(null)}
                             className="absolute top-2 right-2 bg-black/70 text-main w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-black/90 transition-colors"
                           >
-                            ✕
+                            <X size={20} />
                           </button>
                         </div>
                       ) : (
@@ -1703,7 +1729,7 @@ export default function RoomPage() {
                           onClick={() => proofInputRef.current?.click()}
                           className="w-full bg-muted hover:bg-divider text-main font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-divider"
                         >
-                          📷 Attach proof photo
+                          <Camera size={16} className="inline-block mr-1" /> Attach proof photo
                         </button>
                       )}
                     </div>
@@ -1713,7 +1739,7 @@ export default function RoomPage() {
                       onClick={confirmPayment}
                       className="w-full bg-brand text-white font-bold rounded-2xl py-5 text-lg flex items-center justify-center gap-2 hover:bg-opacity-90 active:scale-95 transition-all"
                     >
-                      ✓ Confirm Payment · RM {amountToPay.toFixed(2)}
+                      <Check size={16} className="inline-block mr-1" /> Confirm Payment · RM {amountToPay.toFixed(2)}
                     </button>
                   </div>
                 )}
@@ -1724,20 +1750,29 @@ export default function RoomPage() {
       )}
 
       {/* Floating CTA — Split tab only */}
-      {tab === "split" && (
+      {tab === "split" && isOwner && (
         <div className="sticky bottom-6 mt-8 flex justify-center z-20 pointer-events-none">
           <button
-            onClick={() => {
+            onClick={async () => {
               if (grandTotal <= 0) {
                 alert("Total cannot be 0. Please add items with prices.");
                 return;
               }
+              await updateSession(id, { status: "payment" });
               setTab("pay");
             }}
             className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-brand/20"
           >
             Go to Payment →
           </button>
+        </div>
+      )}
+      
+      {tab === "split" && !isOwner && (
+        <div className="sticky bottom-6 mt-8 flex justify-center z-20 pointer-events-none">
+          <div className="pointer-events-auto bg-surface/80 backdrop-blur-md text-main text-sm rounded-full px-6 py-3 border border-divider shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
+            Waiting for host to proceed to payment...
+          </div>
         </div>
       )}
       {/* Proof image viewer modal */}
@@ -1756,7 +1791,7 @@ export default function RoomPage() {
                 onClick={() => setViewingProof(null)}
                 className="text-subtle hover:text-main w-8 h-8 flex items-center justify-center rounded-full hover:bg-divider transition-all"
               >
-                ✕
+                <X size={24} />
               </button>
             </div>
             <div className="p-4 bg-surface flex justify-center max-h-[80vh] overflow-y-auto">
@@ -1786,7 +1821,7 @@ export default function RoomPage() {
                 onClick={() => setViewingReceipt(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-muted text-subtle hover:text-main hover:bg-divider transition-colors"
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
             <div className="p-4 bg-surface flex justify-center max-h-[80vh] overflow-y-auto">
@@ -1822,7 +1857,7 @@ export default function RoomPage() {
           <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl w-full max-w-sm p-6 space-y-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center">
               <h2 className="text-main font-bold text-lg">Scan to Join Room</h2>
-              <button onClick={() => setShowShareQR(false)} className="text-subtle hover:text-main">✕</button>
+              <button onClick={() => setShowShareQR(false)} className="text-subtle hover:text-main"><X size={20} /></button>
             </div>
             <div className="flex justify-center p-4 bg-white rounded-xl">
               <QRCodeSVG value={`${window.location.origin}/join/${session.code}`} size={200} bgColor="#ffffff" fgColor="#000000" />
