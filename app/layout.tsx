@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/app_icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body suppressHydrationWarning>
+      <body className="animate-app-entrance" suppressHydrationWarning>
         {children}
       </body>
     </html>
