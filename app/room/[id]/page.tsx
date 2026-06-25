@@ -1758,7 +1758,7 @@ export default function RoomPage() {
                 alert("Total cannot be 0. Please add items with prices.");
                 return;
               }
-              await updateSession(id, { status: "payment" });
+              await updateSession(id, { status: "paying" });
               setTab("pay");
             }}
             className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-sm border border-brand/20"
