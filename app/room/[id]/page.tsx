@@ -106,7 +106,7 @@ export default function RoomPage() {
   // Auto-switch to payment tab when owner changes session status
   const prevStatus = useRef(session?.status);
   useEffect(() => {
-    if (session?.status === "payment" && prevStatus.current !== "payment") {
+    if (session?.status === "paying" && prevStatus.current !== "paying") {
       setTab("pay");
     }
     prevStatus.current = session?.status;
