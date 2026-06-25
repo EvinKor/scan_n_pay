@@ -123,11 +123,12 @@ export default function JoinPage() {
       </button>
       
       {/* Logo */}
-      <div className="mb-10 text-center">
-        <div className="w-full max-w-[240px] mx-auto mb-4">
-          <img src="/app_icon.png" alt="Split Lah Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
+      <div className="mb-12 text-center relative z-10">
+        <div className="w-full max-w-[240px] mx-auto mb-6 relative group">
+          <img src="/Logo.png" alt="We Split Logo" className="w-full h-auto drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] rounded-2xl relative z-10 group-hover:scale-105 group-hover:rotate-2 transition-all duration-500" />
+          <div className="absolute inset-0 bg-brand/20 blur-3xl rounded-full scale-125 -z-0"></div>
         </div>
-        <p className="text-subtle mt-1 text-sm">
+        <p className="text-subtle mt-2 text-sm">
           Room: <span className="text-brand font-mono tracking-widest">{code}</span>
         </p>
       </div>
@@ -229,7 +230,7 @@ export default function JoinPage() {
       </div>
 
       <p className="mt-12 text-subtle text-xs text-center">
-        Powered by SplitLah · No account needed
+        Powered by We Split · No account needed
       </p>
     </main>
   );

@@ -177,7 +177,7 @@ export default function ScanPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join SplitLah",
+          title: "Join We Split",
           text: `Join my bill split room: ${session.code}`,
           url: joinUrl,
         });

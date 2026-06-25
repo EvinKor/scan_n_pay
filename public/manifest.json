@@ -1,6 +1,6 @@
 {
   "name": "Receipt Split",
-  "short_name": "SplitLah",
+  "short_name": "We Split",
   "description": "Scan receipts, split bills, pay via TNG",
   "start_url": "/",
   "display": "standalone",

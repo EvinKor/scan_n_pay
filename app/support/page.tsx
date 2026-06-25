@@ -15,7 +15,7 @@ export default function SupportPage() {
       <div className="flex items-center justify-between mb-12 relative z-10">
         <button
           onClick={() => router.back()}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-divider text-main hover:bg-muted transition-colors"
         >
           ←
         </button>
@@ -38,7 +38,7 @@ export default function SupportPage() {
           </p>
         </div>
 
-        <div className="w-full bg-surface/80 backdrop-blur-xl border border-divider rounded-3xl p-8 shadow-[0_20px_60px_rgb(0,0,0,0.4)] space-y-6 transform transition-all hover:scale-[1.02]">
+        <div className="w-full bg-surface border border-divider rounded-3xl p-8 shadow-[0_20px_60px_rgb(0,0,0,0.4)] space-y-6 transform transition-all hover:scale-[1.02]">
           <div className="text-center space-y-2">
             <p className="text-subtle text-xs uppercase tracking-widest font-bold">Touch &apos;n Go eWallet</p>
             <p className="text-main font-semibold text-lg">Evin</p>

@@ -1,4 +1,4 @@
-# 🧾 SplitLah — Receipt Split PWA
+# 🧾 We Split — Receipt Split PWA
 
 Scan receipts, split bills, pay via Touch 'n Go. No login required.
 
@@ -80,7 +80,7 @@ Payer    → Sees real-time payment status
 
 The pay button opens:
 ```
-tngd://payment?phoneNo=601XXXXXXXX&amount=XX.XX&memo=SplitLah+MAKAN-7X2
+tngd://payment?phoneNo=601XXXXXXXX&amount=XX.XX&memo=We+Split+MAKAN-7X2
 ```
 
 This deep link opens the TNG app pre-filled with the payer's number and the owed amount.

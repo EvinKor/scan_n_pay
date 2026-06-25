@@ -10,7 +10,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "SplitLah — Receipt Splitter",
+  title: "We Split — Receipt Splitter",
   description: "Scan receipts, split bills, pay via TNG",
   manifest: "/manifest.json",
   icons: {
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SplitLah",
+    title: "We Split",
   },
 };
 

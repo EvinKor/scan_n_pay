@@ -79,7 +79,7 @@ export default function HistoryPage() {
   return (
     <main className="min-h-screen bg-background text-main pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-divider pt-[env(safe-area-inset-top)]">
+      <div className="sticky top-0 z-50 bg-background/90  border-b border-divider pt-[env(safe-area-inset-top)]">
         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
           <button 
             onClick={() => router.back()}
@@ -99,7 +99,7 @@ export default function HistoryPage() {
             <p className="text-subtle text-sm">Loading history...</p>
           </div>
         ) : history.length === 0 ? (
-          <div className="text-center py-12 bg-surface/80 backdrop-blur-md border border-divider rounded-2xl">
+          <div className="text-center py-12 bg-surface border border-divider rounded-2xl">
             <span className="text-subtle mb-4 flex justify-center"><Ghost size={48} /></span>
             <p className="text-subtle">No past receipts found.</p>
           </div>
@@ -120,7 +120,7 @@ export default function HistoryPage() {
                     "relative overflow-hidden w-full border rounded-xl p-4 text-left transition-all block group",
                     h.data?.status === "done"
                       ? "bg-[#015ABF]/10 border-[#015ABF]/30 hover:bg-[#015ABF]/20"
-                      : "bg-surface/80 backdrop-blur-md border-divider hover:border-brand/50 hover:bg-brand/5"
+                      : "bg-surface border-divider hover:border-brand/50 hover:bg-brand/5"
                   )}
                 >
                   {h.data?.status === "done" && (
@@ -152,7 +152,7 @@ export default function HistoryPage() {
                   </div>
                   
                   {/* Participants section */}
-                  <div className="bg-background rounded-lg p-2.5 border border-divider/50">
+                  <div className="bg-background rounded-lg p-2.5 border border-divider">
                     <p className="text-subtle text-[10px] uppercase tracking-widest font-bold mb-1">Owner: {h.data?.owner || "Unknown"}</p>
                     <p className="text-main text-xs line-clamp-2 leading-relaxed">
                           <Users size={12} className="inline-block mr-1 text-subtle" /> {participantsList || "Unknown"}

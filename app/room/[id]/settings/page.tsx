@@ -83,7 +83,7 @@ export default function RoomSettingsPage() {
     <main className="min-h-screen pb-32 max-w-lg mx-auto">
       {/* Header */}
       <div className="px-4 pt-8 pb-6 flex items-center gap-3">
-        <button onClick={() => router.push(`/room/${id}`)} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors">
+        <button onClick={() => router.push(`/room/${id}`)} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-full bg-surface border border-divider text-main hover:bg-muted transition-colors">
           ←
         </button>
         <h1 className="text-xl font-bold text-main">Room Settings</h1>
@@ -101,7 +101,7 @@ export default function RoomSettingsPage() {
               type="text"
               value={localGroupName}
               onChange={(e) => setLocalGroupName(e.target.value)}
-              className="flex-1 w-full bg-muted border border-divider/50 rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors text-sm font-medium"
+              className="flex-1 w-full bg-muted border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors text-sm font-medium"
               placeholder="Enter group name"
               maxLength={30}
             />
@@ -133,7 +133,7 @@ export default function RoomSettingsPage() {
               Change
             </button>
           </div>
-          <div className="bg-muted border border-divider/50 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="bg-muted border border-divider rounded-xl px-4 py-3 flex items-center gap-3">
             <span className="text-subtle flex items-center justify-center">{session.splitMode === "even" ? <Scale size={24} /> : <Target size={24} />}</span>
             <span className="text-main font-medium text-sm">{session.splitMode === "even" ? "Split evenly" : "Choose items"}</span>
           </div>
@@ -142,7 +142,7 @@ export default function RoomSettingsPage() {
         {/* Manage Participants */}
         <div className="bg-surface p-4 rounded-xl">
           <p className="text-xs text-subtle uppercase tracking-wide mb-3">Manage Participants</p>
-          <div className="bg-muted border border-divider/50 rounded-xl divide-y divide-divider/50">
+          <div className="bg-muted border border-divider rounded-xl divide-y divide-divider/50">
             {session.participants.map(p => (
               <div key={p.name} className="flex items-center justify-between p-3">
                 <span className="text-main text-sm flex items-center gap-2">
@@ -182,8 +182,8 @@ export default function RoomSettingsPage() {
 
       {/* Split Method Popup */}
       {showSplitPopup && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => setShowSplitPopup(false)}>
-          <div className="w-full max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.5)] animate-in slide-in-from-bottom-8 duration-300" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80  flex items-end sm:items-center justify-center sm:p-6" onClick={() => setShowSplitPopup(false)}>
+          <div className="w-full max-w-md bg-surface rounded-t-3xl sm:rounded-2xl p-6 shadow-sm animate-in slide-in-from-bottom-8 duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-main font-bold text-lg">Change Split Method</h2>
               <button onClick={() => setShowSplitPopup(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-muted text-subtle hover:text-main transition-colors">✕</button>
@@ -193,7 +193,7 @@ export default function RoomSettingsPage() {
                 onClick={() => handleSplitModeChange("even")}
                 className={clsx(
                   "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
-                  session.splitMode === "even" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider/50 text-main hover:bg-muted"
+                  session.splitMode === "even" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider text-main hover:bg-muted"
                 )}
               >
                 <span className="flex items-center gap-2"><Scale size={18} className="text-subtle" /> Split evenly</span>
@@ -202,7 +202,7 @@ export default function RoomSettingsPage() {
                 onClick={() => handleSplitModeChange("byItem")}
                 className={clsx(
                   "rounded-xl py-3 text-sm font-medium transition-all shadow-sm",
-                  session.splitMode === "byItem" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider/50 text-main hover:bg-muted"
+                  session.splitMode === "byItem" ? "bg-brand text-white shadow-md shadow-brand/20" : "bg-muted border border-divider text-main hover:bg-muted"
                 )}
               >
                 <span className="flex items-center gap-2"><Target size={18} className="text-subtle" /> Choose items</span>

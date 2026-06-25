@@ -18,6 +18,8 @@ export default function Home() {
   const [history, setHistory] = useState<any[]>([]);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [installGuideOS, setInstallGuideOS] = useState<'none' | 'ios' | 'android'>('none');
 
   useEffect(() => {
     // Check current auth session
@@ -30,6 +32,10 @@ export default function Home() {
       setUser(session?.user || null);
       if (session?.user) fetchProfile(session.user.id, session.user.email);
     });
+
+    if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
 
     // Check recent room from legacy identity
     const local = getLocalUser();
@@ -113,8 +119,8 @@ export default function Home() {
   }
 
   function handleLogoClick() {
-    if (deferredPrompt) {
-      setShowInstallDialog(!showInstallDialog);
+    if (!isStandalone) {
+      setShowInstallDialog(true);
     }
   }
 
@@ -132,43 +138,109 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
       {/* Logo */}
       <div className="mb-12 text-center relative z-10 flex flex-col items-center">
-        <div className="w-48 relative">
+        <div className="w-48 relative group">
           <img 
-            src="/app_icon.png" 
-            alt="Split Lah Logo" 
-            className="w-full h-auto drop-shadow-md rounded-xl cursor-pointer active:scale-95 transition-transform relative z-10" 
+            src="/Logo.png" 
+            alt="We Split Logo" 
+            className="w-full h-auto drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] rounded-2xl cursor-pointer group-hover:scale-105 group-hover:rotate-[-2deg] active:scale-95 transition-all duration-500 relative z-10" 
             onClick={handleLogoClick} 
           />
           
+          {/* Atmospheric glow behind logo */}
+          <div className="absolute inset-0 bg-brand/30 blur-2xl rounded-full scale-125 -z-0 group-hover:bg-brand/50 transition-colors duration-500 animate-pulse"></div>
+          <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full scale-150 -z-0 mix-blend-screen translate-x-4 translate-y-4 group-hover:translate-x-6 transition-transform duration-700"></div>
+          
           {/* Click me Indicator */}
-          {deferredPrompt && !showInstallDialog && (
+          {!isStandalone && !showInstallDialog && (
             <div className="absolute -top-2 -right-2 bg-surface/90 backdrop-blur-sm border border-divider text-subtle text-[10px] font-medium px-2.5 py-1 rounded-full shadow-sm rotate-[8deg] animate-pulse pointer-events-none z-20 whitespace-nowrap">
               Click me
             </div>
           )}
           
-          {/* Install Speech Bubble (Responsive Toast) */}
+          {/* Install Modal */}
           {showInstallDialog && (
-            <div 
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 md:absolute md:bottom-auto md:top-1/2 md:left-[110%] md:-translate-x-0 md:-translate-y-1/2 w-[90vw] md:w-[220px] bg-surface/90 backdrop-blur-xl border border-divider p-4 rounded-2xl shadow-[0_10px_40px_rgb(0,0,0,0.5)] z-[100] animate-in fade-in slide-in-from-bottom-4 md:slide-in-from-left-4 duration-300 text-left"
-              onClick={e => e.stopPropagation()}
-            >
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowInstallDialog(false); }}
-                className="absolute top-3 right-3 text-subtle hover:text-main w-6 h-6 flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors"
-              >
-                ✕
-              </button>
-              <h3 className="text-sm font-bold text-main mb-1 pr-6">Add to Home?</h3>
-              <p className="text-subtle text-[11px] mb-3 leading-tight">Install SplitLah for quick access.</p>
-              <button 
-                onClick={handleInstall}
-                className="w-full bg-brand text-white font-bold rounded-xl py-2.5 text-xs hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20"
-              >
-                Install App
-              </button>
-              {/* Pointer (Only on desktop) */}
-              <div className="hidden md:block absolute top-1/2 -left-2 -translate-y-1/2 w-4 h-4 bg-surface/90 backdrop-blur-md border-b border-l border-divider rotate-45" />
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => { setShowInstallDialog(false); setInstallGuideOS('none'); }}>
+              <div className="bg-surface border border-divider w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95 duration-300 text-left" onClick={e => e.stopPropagation()}>
+                <button onClick={() => { setShowInstallDialog(false); setInstallGuideOS('none'); }} className="absolute top-4 right-4 text-subtle hover:text-main bg-muted/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                <img src="/app_icon.png" alt="We Split App Icon" className="w-16 h-16 rounded-2xl drop-shadow-md mb-4" />
+                <h3 className="text-xl font-bold text-main mb-2">Add to Home Screen</h3>
+                <p className="text-subtle text-sm mb-6">Install We Split for quick access and offline use.</p>
+                
+                {installGuideOS === 'none' ? (
+                  <div>
+                    <p className="text-sm text-main font-semibold mb-3">Which device are you using?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={() => setInstallGuideOS('ios')} className="bg-surface border border-divider text-main font-semibold rounded-xl py-4 hover:bg-muted active:scale-95 transition-all flex flex-col items-center gap-2">
+                        <svg xmlns="http://www.w3.org/0000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>
+                        iOS / iPhone
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (deferredPrompt) {
+                            handleInstall();
+                          } else {
+                            setInstallGuideOS('android');
+                          }
+                        }} 
+                        className="bg-surface border border-divider text-main font-semibold rounded-xl py-4 hover:bg-muted active:scale-95 transition-all flex flex-col items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/0000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                        Android
+                      </button>
+                    </div>
+                  </div>
+                ) : installGuideOS === 'ios' ? (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <button onClick={() => setInstallGuideOS('none')} className="text-brand text-xs font-bold hover:underline mb-2 flex items-center gap-1"><svg xmlns="http://www.w3.org/0000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg> Back</button>
+                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-divider/50">
+                      <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-surface rounded-xl shadow-sm text-brand border border-divider">
+                        <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-main">1. Tap Share</p>
+                        <p className="text-xs text-subtle mt-0.5">Tap the share button at the bottom of Safari.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-divider/50">
+                      <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-surface rounded-xl shadow-sm text-brand border border-divider">
+                        <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/><path d="M12 12h.01"/></svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-main">2. Add to Home Screen</p>
+                        <p className="text-xs text-subtle mt-0.5">Scroll down and tap "Add to Home Screen".</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setShowInstallDialog(false); setInstallGuideOS('none'); }} className="w-full mt-2 bg-brand text-white font-bold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20">
+                      Got it!
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <button onClick={() => setInstallGuideOS('none')} className="text-brand text-xs font-bold hover:underline mb-2 flex items-center gap-1"><svg xmlns="http://www.w3.org/0000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg> Back</button>
+                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-divider/50">
+                      <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-surface rounded-xl shadow-sm text-brand border border-divider">
+                        <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-main">1. Open Menu</p>
+                        <p className="text-xs text-subtle mt-0.5">Tap the 3-dots menu at the top right of your browser.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-divider/50">
+                      <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-surface rounded-xl shadow-sm text-brand border border-divider">
+                        <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/><path d="M12 12h.01"/></svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-main">2. Install App</p>
+                        <p className="text-xs text-subtle mt-0.5">Tap "Install app" or "Add to Home screen".</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setShowInstallDialog(false); setInstallGuideOS('none'); }} className="w-full mt-2 bg-brand text-white font-bold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20">
+                      Got it!
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -182,7 +254,7 @@ export default function Home() {
             onClick={() => router.push("/setting")}
             className="absolute -top-20 right-0 w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors z-50"
           >
-            ⚙️
+            <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         )}
 
@@ -199,7 +271,7 @@ export default function Home() {
             <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center text-brand mx-auto mb-2">
               <svg xmlns="http://www.w3.org/0000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
             </div>
-            <h2 className="text-main font-bold text-lg">Welcome to SplitLah</h2>
+            <h2 className="text-main font-bold text-lg">Welcome to We Split</h2>
             <p className="text-subtle text-sm">Log in to save your split history, or continue as a guest.</p>
 
             <div className="space-y-3 pt-2">

@@ -45,12 +45,12 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm space-y-4">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="w-full max-w-[240px] mx-auto mb-4">
-            <img src="/app_icon.png" alt="Split Lah Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
+        <div className="mb-10 text-center relative z-10">
+          <div className="w-full max-w-[240px] mx-auto mb-6 relative group">
+            <img src="/Logo.png" alt="We Split Logo" className="w-full h-auto drop-shadow-[0_15px_35px_rgba(0,0,0,0.5)] rounded-2xl relative z-10 group-hover:scale-105 transition-transform duration-500" />
+            <div className="absolute inset-0 bg-brand/20 blur-3xl rounded-full scale-125 -z-0"></div>
           </div>
-          <p className="text-subtle mt-2 text-sm">Save your split history securely.</p>
+          <p className="text-subtle mt-4 text-sm">Save your split history securely.</p>
         </div>
 
         <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.5)] space-y-4">

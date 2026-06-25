@@ -417,7 +417,7 @@ export default function RoomPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join SplitLah",
+          title: "Join We Split",
           text: `Join my bill split room: ${session.code}`,
           url: joinUrl,
         });
@@ -792,7 +792,7 @@ export default function RoomPage() {
           </div>
           <button
             onClick={() => setShowShareQR(true)}
-            className="bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 flex items-center justify-center hover:bg-muted active:scale-[0.98] transition-transform text-subtle hover:text-main"
+            className="bg-surface border border-divider rounded-xl px-4 flex items-center justify-center hover:bg-muted active:scale-[0.98] transition-transform text-subtle hover:text-main"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect width="5" height="5" x="3" y="3" rx="1" />
@@ -837,7 +837,7 @@ export default function RoomPage() {
           )}
 
           {/* Splitting Method Row */}
-          <div className="bg-surface/80 backdrop-blur-md border border-divider/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+          <div className="bg-surface border border-divider rounded-2xl p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xl">
                 {session.splitMode === "even" ? <Scale size={16} /> : <Target size={16} />}
@@ -895,7 +895,7 @@ export default function RoomPage() {
 
                   {/* Dropdown Menu */}
                   {activeParticipantMenu === p.name && (
-                    <div className="absolute top-full mt-2 left-0 bg-surface/80 backdrop-blur-md border border-divider/50 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] p-1 z-50 flex flex-col min-w-[160px] animate-in slide-in-from-top-2 duration-200">
+                    <div className="absolute top-full mt-2 left-0 bg-surface border border-divider rounded-xl shadow-sm p-1 z-50 flex flex-col min-w-[160px] animate-in slide-in-from-top-2 duration-200">
                       <button
                         onClick={() => {
                           copyClaimLink(p.name);
@@ -939,14 +939,14 @@ export default function RoomPage() {
 
             {/* Add Friend inline form */}
             {isOwner && isAddingFriend && (
-              <div className="mt-3 bg-surface rounded-xl p-3 border border-divider/50 space-y-2">
+              <div className="mt-3 bg-surface rounded-xl p-3 border border-divider space-y-2">
                 <p className="text-subtle text-xs">Create a participant on their behalf:</p>
                 <input
                   type="text"
                   placeholder="Friend's name"
                   value={newFriendName}
                   onChange={(e) => setNewFriendName(e.target.value)}
-                  className="w-full bg-muted border border-divider/50 rounded-lg px-3 py-2 text-main text-sm placeholder-subtle focus:outline-none focus:border-brand transition-colors"
+                  className="w-full bg-muted border border-divider rounded-lg px-3 py-2 text-main text-sm placeholder-subtle focus:outline-none focus:border-brand transition-colors"
                   maxLength={24}
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter") handleAddFriend(); }}
@@ -985,7 +985,7 @@ export default function RoomPage() {
           )}
 
           {/* Items Container with Receipt Theme */}
-          <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative z-10 font-mono">
+          <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 -mx-2 shadow-sm relative z-10 font-mono">
             {renderItemsList(myName)}
           </div>
 
@@ -1034,7 +1034,7 @@ export default function RoomPage() {
                   </div>
                 )}
                 {(addedItemsTotal > 0 || session.serviceCharge > 0 || session.sst > 0 || session.rounding !== 0) && (
-                  <div className="flex justify-between text-subtle text-xs pt-1 border-t border-divider/30 mt-1">
+                  <div className="flex justify-between text-subtle text-xs pt-1 border-t border-divider mt-1">
                     <span>Subtotal</span>
                     <span className="font-mono">RM {itemsSubtotal.toFixed(2)}</span>
                   </div>
@@ -1113,7 +1113,7 @@ export default function RoomPage() {
                 )`;
 
                 return (
-                  <div className="bg-surface/80 backdrop-blur-md border border-divider/50 rounded-2xl p-5 mb-4 shadow-lg">
+                  <div className="bg-surface border border-divider rounded-2xl p-5 mb-4 shadow-lg">
                     <p className="text-xs text-subtle uppercase tracking-wide mb-5 font-semibold">Your Collection Summary</p>
 
                     <div className="flex items-center gap-6">
@@ -1231,7 +1231,7 @@ export default function RoomPage() {
                             </div>
                           </div>
                           {/* Item breakdown */}
-                          <div className="border-t border-divider/50 px-4 py-2 space-y-1">
+                          <div className="border-t border-divider px-4 py-2 space-y-1">
                             {(() => {
                               const personSubtotal = session.items.reduce((sum, item) => {
                                 const share = session.splitMode === "byItem"
@@ -1316,7 +1316,7 @@ export default function RoomPage() {
 
                         {/* Service charge and SST proportional breakdown */}
                                   {(session.serviceCharge > 0 || session.sst > 0 || session.rounding !== 0) && (
-                                    <div className="mt-1 pt-1 border-t border-divider/30 flex flex-col gap-0.5 text-[10px] text-subtle">
+                                    <div className="mt-1 pt-1 border-t border-divider flex flex-col gap-0.5 text-[10px] text-subtle">
                                       {session.serviceCharge > 0 && (
                                         <div className="flex justify-between">
                                           <span>Service Charge</span>
@@ -1529,7 +1529,7 @@ export default function RoomPage() {
                         const mySst = (s.sst || 0) * ratio;
                         const myRounding = (s.rounding || 0) * ratio;
                         return (s.serviceCharge > 0 || s.sst > 0 || s.rounding !== 0) ? (
-                          <div className="pt-2 mt-2 border-t border-divider/30 space-y-1">
+                          <div className="pt-2 mt-2 border-t border-divider space-y-1">
                             <div className="flex justify-between text-xs text-subtle">
                               <span>Subtotal</span>
                               <span className="font-mono">RM {mySubtotal.toFixed(2)}</span>
@@ -1645,7 +1645,7 @@ export default function RoomPage() {
                         </div>
 
                         {session.qrImage && (
-                          <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-4 flex flex-col items-center text-center">
+                          <div className="bg-surface border border-divider rounded-2xl p-4 flex flex-col items-center text-center">
                             <img src={session.qrImage} alt="Payment QR" className="w-48 h-48 rounded-xl object-contain mb-3" />
                             <p className="text-subtle text-sm mb-4">Host's Payment QR</p>
                             <button
@@ -1680,7 +1680,7 @@ export default function RoomPage() {
                                 btn.innerText = "Copied Phone!";
                                 setTimeout(() => (btn.innerText = original), 2000);
                               }}
-                              className="flex-1 bg-surface/80 backdrop-blur-md border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
+                              className="flex-1 bg-surface border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
                               title={session.paidByPhone}
                             >
                               <Copy size={16} className="inline-block mr-1" /> Copy Phone
@@ -1694,7 +1694,7 @@ export default function RoomPage() {
                               btn.innerText = "Copied Amount!";
                               setTimeout(() => (btn.innerText = original), 2000);
                             }}
-                            className="flex-1 bg-surface/80 backdrop-blur-md border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
+                            className="flex-1 bg-surface border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
                           >
                             <Copy size={16} className="inline-block mr-1" /> RM {amountToPay.toFixed(2)}
                           </button>
@@ -1761,7 +1761,7 @@ export default function RoomPage() {
               await updateSession(id, { status: "payment" });
               setTab("pay");
             }}
-            className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-brand/20"
+            className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-sm border border-brand/20"
           >
             Go to Payment →
           </button>
@@ -1770,7 +1770,7 @@ export default function RoomPage() {
       
       {tab === "split" && !isOwner && (
         <div className="sticky bottom-6 mt-8 flex justify-center z-20 pointer-events-none">
-          <div className="pointer-events-auto bg-surface/80 backdrop-blur-md text-main text-sm rounded-full px-6 py-3 border border-divider shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
+          <div className="pointer-events-auto bg-surface text-main text-sm rounded-full px-6 py-3 border border-divider shadow-sm">
             Waiting for host to proceed to payment...
           </div>
         </div>
@@ -1778,7 +1778,7 @@ export default function RoomPage() {
       {/* Proof image viewer modal */}
       {viewingProof && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          className="fixed inset-0 z-50 bg-black/80  flex items-center justify-center p-6"
           onClick={() => setViewingProof(null)}
         >
           <div
@@ -1808,11 +1808,11 @@ export default function RoomPage() {
       {/* Scanned Receipt Modal */}
       {viewingReceipt && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          className="fixed inset-0 z-50 bg-black/80  flex items-center justify-center p-6"
           onClick={() => setViewingReceipt(null)}
         >
           <div
-            className="relative max-w-lg w-full bg-surface rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.5)]"
+            className="relative max-w-lg w-full bg-surface rounded-2xl overflow-hidden shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
@@ -1834,7 +1834,7 @@ export default function RoomPage() {
       {/* Select for Friend Modal */}
       {selectForFriend && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom-full duration-300">
-          <div className="p-4 bg-surface/80 backdrop-blur-md border-b border-divider flex items-center justify-between pt-8 pb-4">
+          <div className="p-4 bg-surface border-b border-divider flex items-center justify-between pt-8 pb-4">
             <div>
               <p className="text-subtle text-xs uppercase tracking-widest">Selecting items for</p>
               <p className="text-main font-bold text-lg flex items-center gap-2"><AnimalAvatar name={selectForFriend} customIcon={session.participants.find(p => p.name === selectForFriend)?.icon} className="w-8 h-8" /> {selectForFriend}</p>
@@ -1842,7 +1842,7 @@ export default function RoomPage() {
             <button onClick={() => setSelectForFriend(null)} className="text-brand font-bold px-4 py-2 bg-brand/10 border border-brand/30 rounded-xl hover:bg-brand/20 transition-all">Done</button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 pb-32">
-            <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative font-mono max-w-lg mx-auto">
+            <div className="receipt-bg receipt-edge-top receipt-edge-bottom px-5 pb-5 pt-3 shadow-sm relative font-mono max-w-lg mx-auto">
               {renderItemsList(selectForFriend)}
             </div>
           </div>
@@ -1853,8 +1853,8 @@ export default function RoomPage() {
 
       {/* Share QR Modal */}
       {showShareQR && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowShareQR(false)}>
-          <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl w-full max-w-sm p-6 space-y-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/80  flex items-center justify-center p-6" onClick={() => setShowShareQR(false)}>
+          <div className="bg-surface border border-divider rounded-2xl w-full max-w-sm p-6 space-y-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center">
               <h2 className="text-main font-bold text-lg">Scan to Join Room</h2>
               <button onClick={() => setShowShareQR(false)} className="text-subtle hover:text-main"><X size={20} /></button>

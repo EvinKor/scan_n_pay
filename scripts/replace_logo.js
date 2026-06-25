@@ -10,7 +10,7 @@ const files = [
 
 const replacement = `
         <div className="w-full max-w-[240px] mx-auto mb-4">
-          <img src="/app_icon.png" alt="Split Lah Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
+          <img src="/app_icon.png" alt="We Split Logo" className="w-full h-auto drop-shadow-md rounded-xl" />
         </div>
 `;
 

@@ -100,7 +100,7 @@ export default function InstallPWA() {
           <div className="bg-surface border border-divider w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-in slide-in-from-bottom-10 duration-300 mb-4" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowIOSInstructions(false)} className="absolute top-4 right-4 text-subtle hover:text-main bg-muted/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><X size={16} /></button>
             <h3 className="text-xl font-bold text-main mb-2">Install App</h3>
-            <p className="text-subtle text-sm mb-6">Install SplitLah on your home screen for quick access.</p>
+            <p className="text-subtle text-sm mb-6">Install We Split on your home screen for quick access.</p>
             
             <div className="space-y-4">
               <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-divider/50">

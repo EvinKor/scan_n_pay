@@ -83,7 +83,7 @@ export default function JoinPage() {
             placeholder="Your display name"
             value={name}
             onChange={(e) => { setName(e.target.value); setError(""); }}
-            className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
+            className="w-full bg-surface border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
             maxLength={24}
           />
           <p className="text-subtle text-xs mt-1">
@@ -100,7 +100,7 @@ export default function JoinPage() {
             placeholder="e.g. MAKAN-7X2"
             value={code}
             onChange={(e) => { setCode(e.target.value); setError(""); }}
-            className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors uppercase font-mono tracking-widest"
+            className="w-full bg-surface border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors uppercase font-mono tracking-widest"
             maxLength={10}
           />
         </div>

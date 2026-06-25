@@ -113,7 +113,7 @@ export default function SettingPage() {
       <div className="flex items-center justify-between mb-8">
         <button 
           onClick={() => router.back()} 
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-divider text-main hover:bg-muted transition-colors"
         >
           ←
         </button>
@@ -128,7 +128,7 @@ export default function SettingPage() {
       ) : (
         <div className="space-y-8">
           {/* Profile Section */}
-          <section className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
+          <section className="bg-surface border border-divider rounded-2xl p-6 shadow-sm">
             <h2 className="text-main font-bold mb-4">Edit Profile</h2>
             
             <div className="space-y-4">
@@ -167,7 +167,7 @@ export default function SettingPage() {
                     <button
                       key={i}
                       onClick={() => setIcon(i)}
-                      className={`h-16 flex items-center justify-center rounded-xl transition-all overflow-hidden ${icon === i ? "ring-2 ring-brand ring-offset-2 ring-offset-background" : "bg-surface border border-divider/50 hover:bg-muted"}`}
+                      className={`h-16 flex items-center justify-center rounded-xl transition-all overflow-hidden ${icon === i ? "ring-2 ring-brand ring-offset-2 ring-offset-background" : "bg-surface border border-divider hover:bg-muted"}`}
                     >
                       <AnimalAvatar name="" customIcon={i} className="w-12 h-12 drop-shadow-sm scale-125" />
                     </button>
@@ -220,7 +220,7 @@ export default function SettingPage() {
           {/* History */}
           <section className="space-y-3">
             <h2 className="text-subtle text-xs uppercase tracking-wide px-2">History</h2>
-            <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-2">
+            <div className="bg-surface border border-divider rounded-2xl p-2">
                <button
                 onClick={() => router.push("/history")}
                 className="w-full bg-transparent hover:bg-muted text-main font-medium rounded-xl py-3 px-4 flex items-center justify-between transition-all"
@@ -238,12 +238,12 @@ export default function SettingPage() {
           <section className="space-y-3">
             <h2 className="text-subtle text-xs uppercase tracking-wide px-2">App Settings</h2>
             
-            <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-2">
+            <div className="bg-surface border border-divider rounded-2xl p-2">
               <InstallPWA />
             </div>
 
             {user ? (
-              <div className="bg-surface/80 backdrop-blur-md border border-divider rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-surface border border-divider rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <p className="text-main font-semibold">Account</p>
                   <p className="text-subtle text-xs">{user.email}</p>
