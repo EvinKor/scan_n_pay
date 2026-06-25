@@ -313,8 +313,9 @@ export default function Home() {
                   if (!user && name.trim()) setLocalUser({ name: name.trim(), sessionId: "" });
                   router.push("/create");
                 }}
-                className="bg-brand text-white font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20"
+                className="bg-brand text-white font-semibold rounded-xl py-3 hover:bg-opacity-90 active:scale-95 transition-all shadow-md shadow-brand/20 flex items-center justify-center gap-2"
               >
+                <svg xmlns="http://www.w3.org/0000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Bill
               </button>
               <button
@@ -323,8 +324,9 @@ export default function Home() {
                   if (!user && name.trim()) setLocalUser({ name: name.trim(), sessionId: "" });
                   router.push("/join");
                 }}
-                className="bg-surface text-main font-semibold rounded-xl py-3 border border-divider hover:bg-muted active:scale-95 transition-all"
+                className="bg-surface text-main font-semibold rounded-xl py-3 border border-divider hover:bg-muted active:scale-95 transition-all flex items-center justify-center gap-2"
               >
+                <svg xmlns="http://www.w3.org/0000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
                 Join Room
               </button>
             </div>
