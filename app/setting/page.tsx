@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Smartphone, ReceiptText } from "lucide-react";
+import { ArrowLeft, Smartphone, ReceiptText, MessageSquare, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getLocalUser, setLocalUser } from "@/lib/identity";
 import InstallPWA from "@/components/InstallPWA";
@@ -21,6 +21,11 @@ export default function SettingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  const [feedback, setFeedback] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -30,13 +35,14 @@ export default function SettingPage() {
       setUser(currentUser);
       if (currentUser) {
         // Fetch from Supabase
-        supabase.from("profiles").select("display_name, icon, phone, tng_qr").eq("id", currentUser.id).maybeSingle()
+        supabase.from("profiles").select("display_name, icon, phone, tng_qr, is_admin").eq("id", currentUser.id).maybeSingle()
           .then(({ data }) => {
             if (data) {
               setName(data.display_name || "");
               setIcon(data.icon || "");
               setPhone(data.phone || "");
               setTngQr(data.tng_qr || "");
+              setIsAdmin(!!data.is_admin);
             }
             setLoading(false);
           });
@@ -99,6 +105,27 @@ export default function SettingPage() {
       setError(e.message || "Failed to save profile");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleFeedbackSubmit() {
+    if (!feedback.trim()) return;
+    setSubmittingFeedback(true);
+    try {
+      // In a real app, this goes to the feedbacks table
+      const { error: dbError } = await supabase.from('feedbacks').insert({
+        message: feedback.trim(),
+        user_id: user?.id || null
+      });
+      if (dbError) throw dbError;
+      
+      setFeedbackSuccess(true);
+      setFeedback("");
+      setTimeout(() => setFeedbackSuccess(false), 3000);
+    } catch (e: any) {
+      setError(e.message || "Failed to submit feedback");
+    } finally {
+      setSubmittingFeedback(false);
     }
   }
 
@@ -217,6 +244,26 @@ export default function SettingPage() {
             </div>
           </section>
 
+          {/* Admin Panel */}
+          {isAdmin && (
+            <section className="space-y-3">
+              <h2 className="text-subtle text-xs uppercase tracking-wide px-2 text-brand">Admin Area</h2>
+              <div className="bg-surface border border-brand/30 rounded-2xl p-2 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-brand/5 group-hover:bg-brand/10 transition-colors"></div>
+                <button
+                  onClick={() => router.push("/admin")}
+                  className="w-full bg-transparent text-brand font-bold rounded-xl py-3 px-4 flex items-center justify-between transition-all relative z-10"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+                    <span>Admin Dashboard</span>
+                  </div>
+                  <span>→</span>
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* History */}
           <section className="space-y-3">
             <h2 className="text-subtle text-xs uppercase tracking-wide px-2">History</h2>
@@ -232,6 +279,28 @@ export default function SettingPage() {
                 <span className="text-subtle">→</span>
               </button>
             </div>
+          </section>
+
+          {/* Feedback Form */}
+          <section className="bg-surface border border-divider rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="text-brand" size={20} />
+              <h2 className="text-main font-bold">Feedback & Suggestions</h2>
+            </div>
+            <p className="text-subtle text-sm mb-4">Have an idea to improve We Split or found a bug? Let us know!</p>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Tell us what you think..."
+              className="w-full bg-muted border border-divider rounded-xl px-4 py-3 text-main text-sm focus:outline-none focus:border-brand transition-colors min-h-[100px] resize-none mb-4"
+            />
+            <button
+              onClick={handleFeedbackSubmit}
+              disabled={submittingFeedback || !feedback.trim()}
+              className="w-full bg-surface border border-divider text-main font-bold rounded-xl py-3 hover:bg-brand/10 hover:text-brand hover:border-brand/30 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {submittingFeedback ? "Submitting..." : "Send Feedback"}
+            </button>
           </section>
 
           {/* Account & App Settings */}
@@ -261,6 +330,14 @@ export default function SettingPage() {
               </button>
             )}
           </section>
+        </div>
+      )}
+
+      {/* Global Notification Alert */}
+      {feedbackSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface/90 backdrop-blur-xl border border-brand/30 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <CheckCircle2 className="text-brand" size={20} />
+          <p className="text-main font-bold text-sm">Thanks for your feedback!</p>
         </div>
       )}
     </main>

@@ -21,6 +21,10 @@ export default function Home() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [installGuideOS, setInstallGuideOS] = useState<'none' | 'ios' | 'android'>('none');
 
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   useEffect(() => {
     // Check current auth session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -111,6 +115,20 @@ export default function Home() {
     // Sort descending by created_at
     merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setHistory(merged);
+
+    // Fetch Notifications
+    supabase.from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setNotifications(data);
+          const lastRead = localStorage.getItem('ws_last_read_notif') || '0';
+          const unread = data.filter(n => new Date(n.created_at).getTime() > parseInt(lastRead)).length;
+          setUnreadCount(unread);
+        }
+      });
   }
 
   async function handleSignOut() {
@@ -134,11 +152,73 @@ export default function Home() {
     }
   }
 
+  function handleNotificationsOpen() {
+    setShowNotifications(true);
+    setUnreadCount(0);
+    localStorage.setItem('ws_last_read_notif', Date.now().toString());
+  }
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+    <main className="h-[100dvh] max-h-[100dvh] flex flex-col items-center justify-center px-6 py-4 sm:py-8 relative overflow-hidden">
+      
+
+
+      {/* Notifications Modal */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6" onClick={() => setShowNotifications(false)}>
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"></div>
+          
+          {/* Modal Body */}
+          <div 
+            className="bg-background/90 backdrop-blur-2xl border border-divider/50 w-full max-w-sm rounded-[2rem] p-1 shadow-[0_20px_60px_rgba(0,0,0,0.6)] relative z-10 flex flex-col max-h-[80vh] animate-in zoom-in-95 fade-in duration-300 overflow-hidden" 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-divider/30 bg-surface/50 rounded-t-[2rem]">
+              <h3 className="text-lg font-extrabold text-main flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                Notifications
+              </h3>
+              <button onClick={() => setShowNotifications(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-muted/50 hover:bg-muted text-subtle hover:text-main transition-colors">
+                <svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className="p-4 overflow-y-auto space-y-3 custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="text-center py-10 flex flex-col items-center">
+                  <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mb-3 text-subtle">
+                    <svg xmlns="http://www.w3.org/0000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+                  </div>
+                  <p className="text-subtle font-medium">All caught up!</p>
+                  <p className="text-xs text-subtle/70 mt-1">No new notifications right now.</p>
+                </div>
+              ) : (
+                notifications.map(n => (
+                  <div key={n.id} className="bg-surface/50 border border-divider/30 rounded-2xl p-4 transition-all hover:bg-surface/80">
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="flex items-center gap-2">
+                        {n.type === 'info' && <span className="w-2 h-2 rounded-full bg-blue-500"></span>}
+                        {n.type === 'warning' && <span className="w-2 h-2 rounded-full bg-yellow-500"></span>}
+                        {n.type === 'success' && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                        <h4 className="text-sm font-bold text-main">{n.title}</h4>
+                      </div>
+                      <span className="text-[10px] text-subtle/80 font-medium">{new Date(n.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-subtle/90 mt-2 leading-relaxed whitespace-pre-wrap pl-4 border-l-2 border-divider/30">{n.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Logo */}
-      <div className="mb-12 text-center relative z-10 flex flex-col items-center">
-        <div className="w-48 relative group">
+      <div className="mt-12 sm:mt-20 mb-8 sm:mb-10 text-center relative z-10 flex flex-col items-center shrink-0">
+        <div className="w-56 sm:w-72 relative group">
           <img 
             src="/Logo.png" 
             alt="We Split Logo" 
@@ -247,17 +327,33 @@ export default function Home() {
         <p className="text-subtle mt-2 text-sm">Scan. Split. Pay via TNG.</p>
       </div>
 
-      {/* User profile or Name input */}
-      <div className="w-full max-w-sm space-y-3 relative">
-        {user && (
+      {/* Top Left Notification Bell */}
+      <div className="absolute top-6 left-6 z-[60]">
+        <button 
+          onClick={handleNotificationsOpen} 
+          className="relative w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.3)] group"
+        >
+          <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-12 transition-transform duration-300"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-background animate-pulse"></span>
+          )}
+        </button>
+      </div>
+
+      {/* Top Right Setting Button */}
+      {user && (
+        <div className="absolute top-6 right-6 z-[60]">
           <button
             onClick={() => router.push("/setting")}
-            className="absolute -top-20 right-0 w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors z-50"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
           >
             <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
-        )}
+        </div>
+      )}
 
+      {/* User profile or Name input */}
+      <div className="w-full max-w-sm flex flex-col min-h-0 relative space-y-3">
         {user ? (
           <div className="bg-surface/80 backdrop-blur-md border border-brand/30 rounded-xl p-4 flex items-center gap-4">
             <AnimalAvatar name={name || user.email} customIcon={icon} className="w-16 h-16 text-xl" />
@@ -274,7 +370,7 @@ export default function Home() {
             <h2 className="text-main font-bold text-lg">Welcome to We Split</h2>
             <p className="text-subtle text-sm">Log in to save your split history, or continue as a guest.</p>
 
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-2 shrink-0">
               <button onClick={() => router.push("/login")} className="w-full bg-brand text-white font-bold rounded-xl py-3 hover:bg-opacity-90 transition-all shadow-md shadow-brand/20">
                 Sign In / Sign Up
               </button>
@@ -304,7 +400,7 @@ export default function Home() {
         {/* Action buttons */}
         {((mode === "idle" && user) || mode === "guest") && (
           <>
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-2 gap-3 pt-1 shrink-0">
               <button
                 onClick={() => {
                   if (!user && !name.trim()) return;
@@ -333,8 +429,8 @@ export default function Home() {
 
             {/* Session History */}
             {history.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-divider">
-                <div className="flex items-center justify-between mb-3">
+              <div className="mt-4 pt-3 sm:pt-4 border-t border-divider flex flex-col min-h-0">
+                <div className="flex items-center justify-between mb-2 sm:mb-3 shrink-0">
                   <h3 className="text-subtle text-xs uppercase tracking-widest font-bold">Recent Bills</h3>
                   {history.length > 3 && (
                     <button
@@ -345,7 +441,7 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                <div className="space-y-2 overflow-y-auto pr-1 custom-scrollbar min-h-[50px]">
                   {history.map(h => {
                     const myTotal = h.data?.totals?.[name] ?? 0;
                     const grandTotal = (h.data?.items?.reduce((s: number, i: any) => s + (Number(i.price) || 0), 0) || 0) + (h.data?.serviceCharge || 0) + (h.data?.sst || 0);
@@ -398,11 +494,11 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <div className="mt-16 space-y-4 text-center pb-8">
+      <div className="mt-6 space-y-2 text-center pb-2 shrink-0">
         <p className="text-subtle text-xs">
           No account needed · Works offline · Pay via TNG
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-2">
           <button 
             onClick={() => router.push("/support")}
             className="text-subtle hover:text-brand transition-colors p-2"
