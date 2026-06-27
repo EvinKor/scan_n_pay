@@ -16,7 +16,7 @@ import { getLocalUser, getLocalUserForRoom, setLocalUserForRoom, addRoomToLocalH
 import { AnimalAvatar } from "@/components/AnimalAvatar";
 import clsx from "clsx";
 import { QRCodeSVG } from "qrcode.react";
-import { Scale, Target, Check, Link2, CreditCard, Banknote, Heart, AlertTriangle, Zap, Paperclip, PartyPopper, Flag, Download, Camera, ClipboardList, ReceiptText, Settings, Plus, X, Copy } from "lucide-react";
+import { Scale, Target, Check, Link2, CreditCard, Banknote, Heart, AlertTriangle, Zap, Paperclip, PartyPopper, Flag, Download, Camera, ClipboardList, ReceiptText, Settings, Plus, X, Copy, Phone } from "lucide-react";
 
 type Tab = "split" | "pay";
 
@@ -32,7 +32,8 @@ export default function RoomPage() {
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [viewingProof, setViewingProof] = useState<string | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
-  const proofInputRef = useRef<HTMLInputElement>(null);
+  const proofGalleryRef = useRef<HTMLInputElement>(null);
+  const proofCaptureRef = useRef<HTMLInputElement>(null);
 
   // Add missing item state
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -413,13 +414,14 @@ export default function RoomPage() {
   async function handleShare() {
     if (!session) return;
     const joinUrl = `${window.location.origin}/join/${session.code}`;
+    const groupName = session.name || session.code;
+    const textToCopy = `Join my bill split room for ${groupName}:\n${joinUrl}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Join We Split",
-          text: `Join my bill split room: ${session.code}`,
-          url: joinUrl,
+          text: textToCopy,
         });
         return;
       } catch {
@@ -428,7 +430,7 @@ export default function RoomPage() {
     }
 
     try {
-      await navigator.clipboard.writeText(joinUrl);
+      await navigator.clipboard.writeText(textToCopy);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {
@@ -455,13 +457,14 @@ export default function RoomPage() {
   async function copyClaimLink(participantName: string) {
     if (!session) return;
     const claimUrl = `${window.location.origin}/join/${session.code}?as=${encodeURIComponent(participantName)}`;
+    const textToCopy = `Here's your receipt split for ${participantName}:\n${claimUrl}`;
     try {
-      await navigator.clipboard.writeText(claimUrl);
+      await navigator.clipboard.writeText(textToCopy);
       setFriendLinkCopied(participantName);
       setTimeout(() => setFriendLinkCopied(null), 2000);
     } catch {
       // fallback
-      prompt("Copy this link:", claimUrl);
+      prompt("Copy this link:", textToCopy);
     }
   }
 
@@ -1468,14 +1471,33 @@ export default function RoomPage() {
             return (
               <div className="space-y-4">
                 {/* Top amount display */}
-                <div className="bg-surface rounded-2xl p-6 text-center">
+                <div 
+                  className="bg-surface rounded-2xl p-6 text-center cursor-pointer hover:bg-surface/80 active:scale-[0.98] transition-all group relative"
+                  onClick={(e) => {
+                    navigator.clipboard.writeText(amountToPay.toFixed(2));
+                    const el = e.currentTarget.querySelector('.copy-feedback');
+                    if (el) {
+                      const originalHtml = el.innerHTML;
+                      el.innerHTML = '<span class="text-xs text-green-500 font-bold">Copied!</span>';
+                      setTimeout(() => (el.innerHTML = originalHtml), 2000);
+                    }
+                  }}
+                  title="Click to copy amount"
+                >
                   <p className="text-subtle text-sm mb-1">
                     {hasUnpaidAddOns ? "Add-on balance" : "You owe"}
                   </p>
-                  <p className="text-4xl font-bold font-mono text-main mb-1">
-                    RM {amountToPay.toFixed(2)}
-                  </p>
-                  <p className="text-subtle text-sm">to {s.paidBy}</p>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <p className="text-4xl font-bold font-mono text-main">
+                      RM {amountToPay.toFixed(2)}
+                    </p>
+                    <div className="copy-feedback text-subtle group-hover:text-main transition-colors p-1">
+                      <Copy size={18} />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <p className="text-subtle text-sm">to {s.paidBy}</p>
+                  </div>
                 </div>
 
                 {/* Box 1: Paid items (shown when user has paid) */}
@@ -1567,9 +1589,16 @@ export default function RoomPage() {
                   </div>
                 )}
 
-                {/* Hidden file input for proof upload */}
+                {/* Hidden file inputs for proof upload */}
                 <input
-                  ref={proofInputRef}
+                  ref={proofGalleryRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProofUpload}
+                  className="hidden"
+                />
+                <input
+                  ref={proofCaptureRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
@@ -1668,37 +1697,47 @@ export default function RoomPage() {
                           </div>
                           <span className="text-sm font-normal opacity-90">Transfer RM {amountToPay.toFixed(2)}</span>
                         </button>
-
-                        <div className="flex gap-2">
-                          {session.paidByPhone && (
-                            <button
-                              onClick={(e) => {
-                                const phoneToCopy = session.paidByPhone?.startsWith("0") ? session.paidByPhone.substring(1) : session.paidByPhone;
-                                navigator.clipboard.writeText(phoneToCopy || "");
-                                const btn = e.currentTarget;
-                                const original = btn.innerText;
-                                btn.innerText = "Copied Phone!";
-                                setTimeout(() => (btn.innerText = original), 2000);
-                              }}
-                              className="flex-1 bg-surface border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
-                              title={session.paidByPhone}
-                            >
-                              <Copy size={16} className="inline-block mr-1" /> Copy Phone
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              navigator.clipboard.writeText(amountToPay.toFixed(2));
-                              const btn = e.currentTarget;
-                              const original = btn.innerText;
-                              btn.innerText = "Copied Amount!";
-                              setTimeout(() => (btn.innerText = original), 2000);
-                            }}
-                            className="flex-1 bg-surface border border-divider hover:bg-muted text-main font-medium rounded-xl py-3 text-sm active:scale-95 transition-all truncate px-2"
-                          >
-                            <Copy size={16} className="inline-block mr-1" /> RM {amountToPay.toFixed(2)}
-                          </button>
-                        </div>
+                        {session.paidByPhone && (() => {
+                          const phoneToCopy = session.paidByPhone.startsWith("0") ? session.paidByPhone.substring(1) : session.paidByPhone;
+                          return (
+                            <div className="mt-4 flex flex-col gap-2">
+                              <span className="text-[10px] text-subtle font-bold uppercase tracking-widest pl-1">Or manual transfer to:</span>
+                              <button
+                                onClick={(e) => {
+                                  navigator.clipboard.writeText(phoneToCopy);
+                                  const overlay = e.currentTarget.querySelector('.phone-copy-overlay');
+                                  if (overlay) {
+                                    overlay.classList.remove('opacity-0');
+                                    overlay.classList.add('opacity-100');
+                                    setTimeout(() => {
+                                      overlay.classList.remove('opacity-100');
+                                      overlay.classList.add('opacity-0');
+                                    }, 2000);
+                                  }
+                                }}
+                                className="w-full group relative overflow-hidden rounded-2xl bg-gradient-to-b from-surface to-muted border border-divider p-1.5 hover:border-brand/40 transition-all active:scale-[0.98]"
+                                title="Copy Phone Number"
+                              >
+                                <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="relative flex items-center justify-between bg-background rounded-xl px-4 py-3 h-[52px]">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center">
+                                      <Phone size={14} />
+                                    </div>
+                                    <span className="font-mono text-lg font-bold text-main tracking-wider">{phoneToCopy}</span>
+                                  </div>
+                                  <div className="w-8 h-8 rounded-full bg-surface border border-divider flex items-center justify-center text-subtle group-hover:text-brand group-hover:border-brand/30 transition-all shadow-sm">
+                                    <Copy size={14} />
+                                  </div>
+                                </div>
+                                <div className="phone-copy-overlay absolute inset-0 z-20 flex items-center justify-center bg-surface/95 backdrop-blur-sm rounded-2xl opacity-0 pointer-events-none transition-opacity duration-200">
+                                  <div className="absolute inset-0 bg-green-500/10 rounded-2xl" />
+                                  <span className="relative text-green-500 font-bold text-sm tracking-wide flex items-center gap-1.5"><Check size={16} /> Copied!</span>
+                                </div>
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -1725,12 +1764,20 @@ export default function RoomPage() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => proofInputRef.current?.click()}
-                          className="w-full bg-muted hover:bg-divider text-main font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-divider"
-                        >
-                          <Camera size={16} className="inline-block mr-1" /> Attach proof photo
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => proofCaptureRef.current?.click()}
+                            className="flex-1 bg-muted hover:bg-divider text-main font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-divider"
+                          >
+                            <Camera size={16} className="inline-block mr-1" /> Take Photo
+                          </button>
+                          <button
+                            onClick={() => proofGalleryRef.current?.click()}
+                            className="flex-1 bg-muted hover:bg-divider text-main font-medium rounded-xl py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all border border-dashed border-divider"
+                          >
+                            Upload Image
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -1770,9 +1817,12 @@ export default function RoomPage() {
       
       {tab === "split" && !isOwner && (
         <div className="sticky bottom-6 mt-8 flex justify-center z-20 pointer-events-none">
-          <div className="pointer-events-auto bg-surface text-main text-sm rounded-full px-6 py-3 border border-divider shadow-sm">
-            Waiting for host to proceed to payment...
-          </div>
+          <button
+            onClick={() => setTab("pay")}
+            className="pointer-events-auto w-full max-w-xs bg-brand text-main font-bold rounded-2xl py-4 text-lg hover:bg-opacity-90 active:scale-95 transition-all shadow-sm border border-brand/20"
+          >
+            Go to Pay →
+          </button>
         </div>
       )}
       {/* Proof image viewer modal */}

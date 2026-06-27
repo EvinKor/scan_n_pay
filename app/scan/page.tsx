@@ -16,7 +16,8 @@ export default function ScanPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileGalleryRef = useRef<HTMLInputElement>(null);
+  const fileCaptureRef = useRef<HTMLInputElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -66,8 +67,20 @@ export default function ScanPage() {
       }
     });
 
+    const pollInterval = setInterval(() => {
+      getSession(id).then((s) => {
+        if (!s) return;
+        if (s.status !== "scanning") {
+          router.push(`/room/${id}`);
+        } else {
+          setSession(s);
+        }
+      });
+    }, 3000);
+
     return () => {
       channel.unsubscribe();
+      clearInterval(pollInterval);
     };
   }, [sessionId]);
 
@@ -138,7 +151,8 @@ export default function ScanPage() {
     setReceiptTotal(0);
     setPreview(null);
     setReceiptBase64("");
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileGalleryRef.current) fileGalleryRef.current.value = "";
+    if (fileCaptureRef.current) fileCaptureRef.current.value = "";
   }
 
   async function handleNext() {
@@ -204,9 +218,16 @@ export default function ScanPage() {
       <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center bg-[#0f0f0f]">
         <div className="w-12 h-12 rounded-full border-2 border-brand border-t-transparent animate-spin mb-6 mx-auto" />
         <h2 className="text-xl font-bold text-main mb-2">Waiting for Host</h2>
-        <p className="text-subtle text-sm max-w-xs mx-auto">
+        <p className="text-subtle text-sm max-w-xs mx-auto mb-8">
           The host is currently scanning and adjusting the receipt items. You will automatically join them once they are done.
         </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-zinc-800 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-zinc-700 transition-colors flex items-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Refresh Manually
+        </button>
       </main>
     );
   }
@@ -231,9 +252,8 @@ export default function ScanPage() {
 
       {/* Camera / Upload */}
       <div
-        onClick={() => fileRef.current?.click()}
         className={clsx(
-          "relative rounded-xl border border-zinc-800 flex flex-col items-center justify-center p-6 mb-8 cursor-pointer transition-all hover:border-zinc-600 bg-zinc-900/30",
+          "relative rounded-xl border border-zinc-800 flex flex-col items-center justify-center p-6 mb-8 transition-all bg-zinc-900/30",
           preview && "border-zinc-700 bg-transparent"
         )}
         style={{ minHeight: 140 }}
@@ -262,32 +282,68 @@ export default function ScanPage() {
                 </>
               )}
               {!scanning && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileRef.current?.click();
-                  }}
-                  className="bg-muted border border-divider hover:bg-divider active:scale-95 transition-all text-brand px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 mt-2"
-                >
-                  <svg xmlns="http://www.w3.org/0000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                  Rescan / Upload New
-                </button>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileCaptureRef.current?.click();
+                    }}
+                    className="bg-muted border border-divider hover:bg-divider active:scale-95 transition-all text-brand px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                    Retake
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileGalleryRef.current?.click();
+                    }}
+                    className="bg-muted border border-divider hover:bg-divider active:scale-95 transition-all text-brand px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    Gallery
+                  </button>
+                </div>
               )}
             </div>
         ) : (
-            <div className="text-center">
+            <div className="text-center w-full">
               <span className="block text-zinc-500 mb-3 flex justify-center">
-                <svg xmlns="http://www.w3.org/0000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
               </span>
-              <p className="text-zinc-300 text-sm font-medium">Upload Receipt</p>
-              <p className="text-zinc-500 text-xs mt-1">Take a photo or choose from gallery</p>
+              <p className="text-zinc-300 text-sm font-medium mb-4">Upload Receipt</p>
+              <div className="flex items-center justify-center gap-3 w-full px-4">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); fileCaptureRef.current?.click(); }}
+                  className="flex-1 bg-zinc-800 text-white py-2 rounded-xl text-xs font-semibold hover:bg-zinc-700 transition-colors"
+                >
+                  Take Photo
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); fileGalleryRef.current?.click(); }}
+                  className="flex-1 bg-zinc-800 text-white py-2 rounded-xl text-xs font-semibold hover:bg-zinc-700 transition-colors"
+                >
+                  Gallery
+                </button>
+              </div>
             </div>
         )}
             <input
-              ref={fileRef}
+              ref={fileGalleryRef}
               type="file"
               accept="image/*"
+              onChange={handleFile}
+              className="hidden"
+            />
+            <input
+              ref={fileCaptureRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               onChange={handleFile}
               className="hidden"
             />
