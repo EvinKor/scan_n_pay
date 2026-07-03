@@ -377,8 +377,21 @@ export default function ScanPage() {
                   <span className="text-subtle text-xs">×</span>
                   <input
                     type="number"
-                    value={item.quantity || 1}
-                    onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                    value={item.quantity === 0 ? "" : item.quantity || ""}
+                    onChange={(e) => {
+                      const newQty = e.target.value === "" ? 0 : parseInt(e.target.value);
+                      const oldQty = item.quantity || 1;
+                      const unitPrice = (item.price || 0) / oldQty;
+                      updateItem(item.id, { 
+                        quantity: newQty,
+                        price: parseFloat((unitPrice * Math.max(1, newQty)).toFixed(2))
+                      });
+                    }}
+                    onBlur={(e) => {
+                      if (!item.quantity || item.quantity <= 0) {
+                        updateItem(item.id, { quantity: 1 });
+                      }
+                    }}
                     min="1"
                     className="w-8 bg-transparent text-center text-main text-sm font-mono focus:outline-none"
                   />

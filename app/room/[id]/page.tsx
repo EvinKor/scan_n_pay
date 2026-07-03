@@ -144,7 +144,7 @@ export default function RoomPage() {
       id: Math.random().toString(36).substring(2, 9),
       name: newItemName.trim(),
       quantity: newItemQty,
-      price: price,
+      price: price * newItemQty, // price input acts as unit price, so we multiply by qty to get line total
       assignedTo: { [effectiveName]: newItemQty },
       addedLater: true,
     };
