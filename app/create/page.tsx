@@ -18,6 +18,8 @@ export default function CreatePage() {
   const [splitMode, setSplitMode] = useState<"even" | "byItem">("even");
   const [user, setUser] = useState<any>(null);
   const [step, setStep] = useState<1 | 2>(1);
+  const [paidByMode, setPaidByMode] = useState<"self" | "friend">("self");
+  const [friendName, setFriendName] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -86,12 +88,22 @@ export default function CreatePage() {
 
   async function handleCreate(selectedMode: "even" | "byItem") {
     if (!name.trim()) return setError("Enter your name first");
+    if (paidByMode === "friend" && !friendName.trim()) return setError("Enter your friend's name");
+    if (paidByMode === "self" && !phone.trim()) return setError("Enter your phone number first");
     setLoading(true);
     setSplitMode(selectedMode);
     try {
       const local = getLocalUser();
-      const session = await createSession(name.trim(), selectedMode, qrImage || undefined, local?.icon, phone.trim(), groupName.trim());
-      setLocalUser({ name: name.trim(), sessionId: session.id, icon: local?.icon, phone: phone.trim(), tng_qr: qrImage || undefined });
+      const session = await createSession(
+        name.trim(),
+        selectedMode,
+        paidByMode === "self" ? (qrImage || undefined) : undefined,
+        local?.icon,
+        paidByMode === "self" ? phone.trim() : undefined,
+        groupName.trim(),
+        paidByMode === "friend" ? friendName.trim() : undefined
+      );
+      setLocalUser({ name: name.trim(), sessionId: session.id, icon: local?.icon, phone: paidByMode === "self" ? phone.trim() : undefined, tng_qr: paidByMode === "self" ? (qrImage || undefined) : undefined });
       setLocalUserForRoom(session.id, name.trim(), local?.icon);
       router.push(`/scan?session=${session.id}`);
     } catch (e) {
@@ -116,6 +128,29 @@ export default function CreatePage() {
               <p className="text-subtle mt-1 text-sm">Create a room to scan and split</p>
             </div>
 
+            {/* Who paid toggle */}
+            <div className="mb-5">
+              <p className="text-subtle text-xs uppercase tracking-wide mb-2">Who paid the bill?</p>
+              <div className="grid grid-cols-2 gap-2 bg-surface rounded-xl p-1">
+                <button
+                  onClick={() => { setPaidByMode("self"); setError(""); }}
+                  className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    paidByMode === "self" ? "bg-brand text-white shadow-md" : "text-subtle hover:text-main"
+                  }`}
+                >
+                  I Paid
+                </button>
+                <button
+                  onClick={() => { setPaidByMode("friend"); setError(""); }}
+                  className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    paidByMode === "friend" ? "bg-brand text-white shadow-md" : "text-subtle hover:text-main"
+                  }`}
+                >
+                  My Friend Paid
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="text-subtle text-xs uppercase tracking-wide mb-1 flex justify-between">
                 <span>Your name</span>
@@ -134,6 +169,22 @@ export default function CreatePage() {
               </p>
             </div>
 
+            {/* Friend's name — only when friend paid */}
+            {paidByMode === "friend" && (
+              <div className="bg-brand/5 border border-brand/20 rounded-xl p-4">
+                <label className="text-brand text-xs uppercase tracking-wide mb-2 block font-bold">Friend who paid</label>
+                <input
+                  type="text"
+                  placeholder="Friend's display name"
+                  value={friendName}
+                  onChange={(e) => { setFriendName(e.target.value); setError(""); }}
+                  className="w-full bg-surface border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors"
+                  maxLength={24}
+                />
+                <p className="text-brand/70 text-xs mt-2">They'll be added to the room and can set up their payment details when they join.</p>
+              </div>
+            )}
+
             <div>
               <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Group Name (Optional)</label>
               <input
@@ -145,38 +196,43 @@ export default function CreatePage() {
                 maxLength={30}
               />
 
-              <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Phone Number / DuitNow ID <span className="text-red-400">*</span></label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="e.g. 0123456789"
-                className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors mb-4"
-              />
+              {/* Phone + QR only shown when creator is the payer */}
+              {paidByMode === "self" && (
+                <>
+                  <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">Phone Number / DuitNow ID <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. 0123456789"
+                    className="w-full bg-surface/80 backdrop-blur-md border border-divider rounded-xl px-4 py-3 text-main placeholder-subtle focus:outline-none focus:border-brand transition-colors mb-4"
+                  />
 
-              <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">
-                Payment QR Code (Optional)
-              </label>
-              <div className="relative group cursor-pointer border-2 border-dashed border-divider rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleQRUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                {qrImage ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={qrImage} alt="QR Code" className="w-16 h-16 rounded-lg object-cover" />
-                    <span className="text-brand text-xs font-semibold">QR Uploaded! (Tap to change)</span>
+                  <label className="text-subtle text-xs uppercase tracking-wide mb-1 block">
+                    Payment QR Code (Optional)
+                  </label>
+                  <div className="relative group cursor-pointer border-2 border-dashed border-divider rounded-xl p-4 text-center hover:border-brand hover:bg-brand/5 transition-all">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleQRUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    {qrImage ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <img src={qrImage} alt="QR Code" className="w-16 h-16 rounded-lg object-cover" />
+                        <span className="text-brand text-xs font-semibold">QR Uploaded! (Tap to change)</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-subtle"><Smartphone size={24} /></span>
+                        <span className="text-subtle text-sm">Upload your TNG/DuitNow QR</span>
+                        <span className="text-subtle text-xs">Guests can save &amp; scan it to pay</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-subtle"><Smartphone size={24} /></span>
-                    <span className="text-subtle text-sm">Upload your TNG/DuitNow QR</span>
-                    <span className="text-subtle text-xs">Guests can save & scan it to pay</span>
-                  </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-3 pt-2">
@@ -184,7 +240,8 @@ export default function CreatePage() {
               <button
                 onClick={() => {
                   if (!name.trim()) return setError("Enter your name first");
-                  if (!phone.trim()) return setError("Enter your phone number first");
+                  if (paidByMode === "friend" && !friendName.trim()) return setError("Enter your friend's name");
+                  if (paidByMode === "self" && !phone.trim()) return setError("Enter your phone number first");
                   setError("");
                   setStep(2);
                 }}

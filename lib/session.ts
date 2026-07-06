@@ -56,17 +56,27 @@ export async function createSession(
   qrImage?: string,
   creatorIcon?: string,
   phone?: string,
-  groupName?: string
+  groupName?: string,
+  friendName?: string // If set, the friend is the payer and also a participant
 ): Promise<Session> {
   const code = generateCode();
+
+  // Build participants list — always include creator, and friend if provided
+  const participants: Session["participants"] = [
+    { name: creatorName, icon: creatorIcon, hasPaid: false },
+  ];
+  if (friendName && friendName.trim()) {
+    participants.push({ name: friendName.trim(), hasPaid: false });
+  }
+
   const session: Omit<Session, "id" | "createdAt"> = {
     name: groupName || code,
     code,
     owner: creatorName,
-    paidBy: "",
-    paidByPhone: phone || "",
-    qrImage,
-    participants: [{ name: creatorName, icon: creatorIcon, hasPaid: false }],
+    paidBy: friendName?.trim() || "",
+    paidByPhone: friendName ? "" : (phone || ""), // friend's phone unknown yet
+    qrImage: friendName ? undefined : qrImage, // friend hasn't uploaded QR yet
+    participants,
     items: [],
     splitMode,
     status: "scanning",

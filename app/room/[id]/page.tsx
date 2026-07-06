@@ -76,7 +76,10 @@ export default function RoomPage() {
 
     getSession(id).then((s) => {
       if (!s) { router.push("/"); return; }
-      if (s.status === "scanning") router.push(`/scan?session=${id}`);
+      if (s.status === "scanning" && s.owner === myName) {
+        router.push(`/scan?session=${id}`);
+        return;
+      }
       setSession(s);
       addRoomToLocalHistory(id);
     });
@@ -476,6 +479,20 @@ export default function RoomPage() {
     );
   }
 
+  if (session.status === "scanning" && !isOwner) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 rounded-full bg-brand/10 text-brand flex items-center justify-center mb-6 animate-pulse">
+          <ReceiptText size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-main mb-2">Host is Scanning</h1>
+        <p className="text-subtle text-sm max-w-xs mb-8">
+          Please wait while {session.owner} uploads and processes the receipt. This page will update automatically.
+        </p>
+      </main>
+    );
+  }
+
   const totals = calculateTotals(session);
 
   const myTotal = totals?.[myName] ?? 0;
@@ -518,6 +535,27 @@ export default function RoomPage() {
       unclaimedAmount = unclaimedSubtotal + (session.serviceCharge || 0) * ratioUnclaimed + (session.sst || 0) * ratioUnclaimed + (session.rounding || 0) * ratioUnclaimed;
     }
   }
+
+  // Compute "Your Total" from actual claimed items only (isLocked=false),
+  // so the payer sees RM 0.00 when they've unselected everything.
+  let myClaimedSubtotal = 0;
+  if (session.splitMode === "even") {
+    myClaimedSubtotal = itemsSubtotal / (session.participants.length || 1);
+  } else {
+    session.items.forEach(item => {
+      myClaimedSubtotal += getItemShare(item, myName, session.participants.length, false, session.paidBy);
+    });
+  }
+  const myClaimedTotalSubtotal = session.participants.reduce((acc, p) => {
+    return acc + session.items.reduce((s, item) =>
+      s + getItemShare(item, p.name, session.participants.length, false, session.paidBy), 0);
+  }, 0);
+  const myFeeRatio = myClaimedTotalSubtotal > 0 ? myClaimedSubtotal / myClaimedTotalSubtotal : 0;
+  const myProportionalFees = session.splitMode === "even"
+    ? ((session.serviceCharge || 0) + (session.sst || 0) + (session.rounding || 0)) / (session.participants.length || 1)
+    : ((session.serviceCharge || 0) + (session.sst || 0) + (session.rounding || 0)) * myFeeRatio;
+  const myDisplayTotal = Math.max(0, myClaimedSubtotal + myProportionalFees);
+  const myExtraFees = Math.max(0, myDisplayTotal - myClaimedSubtotal);
 
   function renderItemsList(targetName: string) {
     const s = session!;
@@ -996,24 +1034,55 @@ export default function RoomPage() {
           <div className="bg-surface rounded-2xl p-4 space-y-2">
             <div className="bg-brand/10 border border-brand/20 rounded-xl p-3 text-center mb-4">
               <p className="text-brand text-xs uppercase tracking-widest font-bold">Your Total</p>
-              <p className="text-brand font-bold text-2xl font-mono">RM {myTotal.toFixed(2)}</p>
+              <p className="text-brand font-bold text-2xl font-mono">RM {myDisplayTotal.toFixed(2)}</p>
+              {myExtraFees > 0.005 && (
+                <p className="text-brand/70 text-xs mt-1 font-medium">
+                  Includes RM {myExtraFees.toFixed(2)} in tax &amp; fees
+                </p>
+              )}
             </div>
             <p className="text-xs text-subtle uppercase tracking-wide mb-3">Summary</p>
-            {session.participants.map((p) => {
-              const baseTotal = totals?.[p.name] ?? 0;
-              const displayTotal = p.name === session.paidBy ? Math.max(0, baseTotal - unclaimedAmount) : baseTotal;
-
+            {(() => {
+              const paidParticipants = session.participants.filter(p => p.hasPaid);
+              const unpaidParticipants = session.participants.filter(p => !p.hasPaid);
+              const renderRow = (p: typeof session.participants[0]) => {
+                const baseTotal = totals?.[p.name] ?? 0;
+                const displayTotal = p.name === session.paidBy ? Math.max(0, baseTotal - unclaimedAmount) : baseTotal;
+                return (
+                  <div key={p.name} className="flex justify-between items-center">
+                    <span className={clsx("flex items-center text-sm gap-1", p.name === myName && "text-brand font-medium")}>
+                      <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-0.5 w-6 h-6" />
+                      {p.name === myName ? `${p.name} (you)` : p.name}
+                      {p.name === session.paidBy && <span className="text-[10px] text-brand/60 font-bold">host</span>}
+                    </span>
+                    <span className="font-mono text-sm text-main">RM {displayTotal.toFixed(2)}</span>
+                  </div>
+                );
+              };
               return (
-                <div key={p.name} className="flex justify-between items-center">
-                  <span className={clsx("flex items-center text-sm", p.name === myName && "text-brand font-medium")}>
-                    <AnimalAvatar name={p.name} customIcon={p.icon} className="mr-1.5 w-6 h-6" />{p.name === myName ? `${p.name} (you)` : p.name}
-                  </span>
-                  <span className="font-mono text-sm text-main">
-                    RM {displayTotal.toFixed(2)}
-                  </span>
+                <div className="space-y-3">
+                  {paidParticipants.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-brand/80 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-brand inline-block" /> Paid
+                      </p>
+                      {paidParticipants.map(renderRow)}
+                    </div>
+                  )}
+                  {paidParticipants.length > 0 && unpaidParticipants.length > 0 && (
+                    <div className="border-t border-divider" />
+                  )}
+                  {unpaidParticipants.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-subtle uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-divider inline-block" /> Pending
+                      </p>
+                      {unpaidParticipants.map(renderRow)}
+                    </div>
+                  )}
                 </div>
               );
-            })}
+            })()}
             {unclaimedAmount > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-sm italic text-subtle">
@@ -1664,6 +1733,30 @@ export default function RoomPage() {
                     {/* TNG: Open TNG app button */}
                     {paymentMethod === "tng" && (
                       <div className="space-y-3">
+                        {/* Waiting state — shown when payer hasn't set up their details yet */}
+                        {!session.paidByPhone && !session.qrImage ? (
+                          <div className="bg-surface border border-divider rounded-2xl p-6 flex flex-col items-center gap-4 text-center">
+                            <div className="relative flex items-center justify-center">
+                              <div className="w-16 h-16 rounded-full bg-brand/10 flex items-center justify-center animate-pulse">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand">
+                                  <rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" />
+                                </svg>
+                              </div>
+                              <div className="absolute inset-0 rounded-full border-2 border-brand/30 animate-ping" />
+                            </div>
+                            <div>
+                              <p className="text-main font-semibold text-sm">Waiting for {s.paidBy} to set up payment details</p>
+                              <p className="text-subtle text-xs mt-1">{s.paidBy} needs to add their phone or TNG QR in Settings. This will update automatically.</p>
+                            </div>
+                            <button
+                              onClick={() => { setPaymentMethod(null); }}
+                              className="text-subtle text-xs hover:text-main transition-colors underline underline-offset-4"
+                            >
+                              ← Go back
+                            </button>
+                          </div>
+                        ) : (
+                          <>
                         <div className="bg-brand/10 border border-brand/20 p-3 rounded-xl mb-4">
                           <p className="text-brand font-bold text-sm mb-1">TNG Payment Guidelines</p>
                           <p className="text-brand text-xs">There are 2 ways to pay via TNG:</p>
@@ -1738,8 +1831,10 @@ export default function RoomPage() {
                             </div>
                           );
                         })()}
-                      </div>
+                      </>
                     )}
+                  </div>
+                )}
 
                     {/* Proof upload */}
                     <div className="bg-surface rounded-2xl p-4 space-y-3">
