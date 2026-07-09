@@ -6,6 +6,7 @@ import { createSession, joinSession } from "@/lib/session";
 import { setLocalUser, setLocalUserForRoom, getLocalUser, getLocalHistory } from "@/lib/identity";
 import { supabase } from "@/lib/supabase";
 import { AnimalAvatar } from "@/components/AnimalAvatar";
+import { QRCodeSVG } from "qrcode.react";
 import clsx from "clsx";
 
 export default function Home() {
@@ -20,6 +21,8 @@ export default function Home() {
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [installGuideOS, setInstallGuideOS] = useState<'none' | 'ios' | 'android'>('none');
+  const [showShareAppQR, setShowShareAppQR] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -162,6 +165,52 @@ export default function Home() {
     <main className="h-[100dvh] max-h-[100dvh] flex flex-col items-center justify-center px-6 py-4 sm:py-8 relative overflow-hidden">
       
 
+      {/* Share App QR Modal */}
+      {showShareAppQR && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={() => setShowShareAppQR(false)}>
+          <div className="bg-surface border border-divider rounded-3xl w-full max-w-sm p-8 shadow-2xl relative animate-in zoom-in-95 duration-300 text-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowShareAppQR(false)} className="absolute top-4 right-4 text-subtle hover:text-main bg-muted/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+              <svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+            
+            <div className="mx-auto w-16 h-16 bg-brand/10 text-brand rounded-2xl flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/0000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+            </div>
+            
+            <h2 className="text-main font-extrabold text-2xl mb-2">Share We Split</h2>
+            <p className="text-subtle text-sm mb-8 px-4">Let your friends scan this QR code to quickly open the app on their phones.</p>
+            
+            <div className="flex justify-center p-6 bg-white rounded-3xl shadow-inner border border-divider/50 inline-block mx-auto mb-4">
+              {typeof window !== "undefined" && (
+                <QRCodeSVG value={window.location.origin} size={220} bgColor="#ffffff" fgColor="#000000" level="H" />
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  navigator.clipboard.writeText(window.location.origin);
+                  setShareLinkCopied(true);
+                  setTimeout(() => setShareLinkCopied(false), 2000);
+                }
+              }}
+              className="w-full max-w-[220px] mx-auto bg-muted hover:bg-divider text-main font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors border border-divider/50"
+            >
+              {shareLinkCopied ? (
+                <>
+                  <svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span className="text-brand">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/0000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-subtle"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  <span>Copy Link</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Notifications Modal */}
       {showNotifications && (
@@ -340,17 +389,27 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Top Right Setting Button */}
-      {user && (
-        <div className="absolute top-6 right-6 z-[60]">
+
+      {/* Top Right Actions */}
+      <div className="absolute top-6 right-6 z-[60] flex items-center gap-3">
+        {/* Share App Button */}
+        <button
+          onClick={() => setShowShareAppQR(true)}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.3)] group"
+        >
+          <svg xmlns="http://www.w3.org/0000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform duration-300"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+
+        {/* Setting Button */}
+        {user && (
           <button
             onClick={() => router.push("/setting")}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-surface/80 backdrop-blur-md border border-divider text-main hover:bg-muted transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
           >
             <svg xmlns="http://www.w3.org/0000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* User profile or Name input */}
       <div className="w-full max-w-sm flex flex-col min-h-0 relative space-y-3">
